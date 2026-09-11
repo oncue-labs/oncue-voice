@@ -1,12 +1,16 @@
 from oncue_voice.evaluation.service import EvaluationService
+from oncue_voice.providers.fake_realtime_provider import FakeRealtimeProvider
 from oncue_voice.providers.fake_llm_provider import FakeLlmProvider
 from oncue_voice.providers.fake_stt_provider import FakeSttProvider
 from oncue_voice.providers.fake_tts_provider import FakeTtsProvider
 from oncue_voice.providers.factory import (
     ProviderFactory,
     create_openai_factory,
+    create_openai_realtime_provider,
 )
 from oncue_voice.providers.models import ProviderBundle, ProviderCapabilities
+from oncue_voice.providers.realtime_models import RealtimeEvent
+from oncue_voice.providers.realtime_provider import RealtimeProvider
 
 
 def create_evaluation_service(provider: str) -> EvaluationService:
@@ -15,6 +19,24 @@ def create_evaluation_service(provider: str) -> EvaluationService:
     if provider == "openai":
         return EvaluationService(create_openai_factory())
     raise ValueError(f"Unsupported evaluation provider: {provider}")
+
+
+def create_realtime_provider(provider: str) -> RealtimeProvider:
+    if provider == "fake":
+        return FakeRealtimeProvider(
+            (
+                RealtimeEvent(type="speech_started"),
+                RealtimeEvent(type="audio_delta", audio=b"\x00\x00" * 240),
+                RealtimeEvent(
+                    type="transcript_completed",
+                    text="합성 테스트 발화입니다.",
+                ),
+                RealtimeEvent(type="response_completed"),
+            )
+        )
+    if provider == "openai":
+        return create_openai_realtime_provider()
+    raise ValueError(f"Unsupported realtime provider: {provider}")
 
 
 def create_fake_factory() -> ProviderFactory:

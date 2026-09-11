@@ -6,7 +6,7 @@ requires-python = ">=3.11,<3.12"
 authors = [{ name = "OnCue Labs" }]
 dependencies = [
     "fastapi>=0.115,<1.0",
-    "openai>=1.0,<3.0",
+    "openai[realtime]>=2.54,<3.0",
     "PyJWT[crypto]>=2.9,<3.0",
     "pydantic>=2.7,<3.0",
     "redis>=5.0,<6.0",
