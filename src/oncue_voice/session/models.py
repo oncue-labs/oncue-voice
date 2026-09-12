@@ -32,7 +32,7 @@ class CreateSessionRequest(BaseModel):
 
     call_session_id: str = Field(alias="callSessionId")
     user_id: str = Field(alias="userId")
-    policy: DialoguePolicy
+    policy_snapshot: DialoguePolicy = Field(alias="policySnapshot")
     expires_at: datetime = Field(alias="expiresAt")
 
 
@@ -42,11 +42,11 @@ class VoiceSession(BaseModel):
     voice_session_id: str = Field(alias="voiceSessionId")
     call_session_id: str = Field(alias="callSessionId")
     user_id: str = Field(alias="userId")
-    policy: DialoguePolicy
+    policy_snapshot: DialoguePolicy = Field(alias="policySnapshot")
     expires_at: datetime = Field(alias="expiresAt")
     status: SessionStatus
     created_at: datetime = Field(alias="createdAt")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
 
-    def policy_snapshot(self) -> dict[str, Any]:
-        return self.policy.model_dump(mode="json", by_alias=True)
+    def policy_snapshot_json(self) -> dict[str, Any]:
+        return self.policy_snapshot.model_dump(mode="json", by_alias=True)

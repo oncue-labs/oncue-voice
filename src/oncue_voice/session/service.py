@@ -47,7 +47,7 @@ class SessionService:
             voiceSessionId=str(uuid4()),
             callSessionId=request.call_session_id,
             userId=request.user_id,
-            policy=request.policy,
+            policySnapshot=request.policy_snapshot,
             expiresAt=expires_at,
             status=SessionStatus.PREPARED,
             createdAt=now,
@@ -78,7 +78,7 @@ class SessionService:
     def _matches(session: VoiceSession, request: CreateSessionRequest) -> bool:
         return (
             session.user_id == request.user_id
-            and session.policy == request.policy
+            and session.policy_snapshot == request.policy_snapshot
             and session.expires_at == SessionService._utc(request.expires_at)
         )
 

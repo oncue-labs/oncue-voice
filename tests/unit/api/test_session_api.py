@@ -32,7 +32,7 @@ def session_payload(
     return {
         "callSessionId": call_session_id,
         "userId": user_id,
-        "policy": policy_payload(),
+        "policySnapshot": policy_payload(),
         "expiresAt": "2099-01-01T00:00:00Z",
     }
 
@@ -89,7 +89,7 @@ async def test_create_voice_session_returns_internal_id_and_created_at() -> None
 async def test_create_voice_session_requires_dialogue_policy_fields() -> None:
     client, _ = create_client()
     payload = session_payload()
-    payload["policy"] = {"role": "Santa"}
+    payload["policySnapshot"] = {"role": "Santa"}
 
     async with client:
         response = await client.post(

@@ -36,7 +36,7 @@ def create_request(
     return CreateSessionRequest(
         call_session_id=call_session_id,
         user_id=user_id,
-        policy=create_policy(),
+        policySnapshot=create_policy(),
         expires_at=expiry,
     )
 
@@ -51,7 +51,7 @@ def test_create_generates_voice_session_and_stores_policy_snapshot() -> None:
     assert session.call_session_id == "call-1"
     assert session.user_id == "user-1"
     assert session.status is SessionStatus.PREPARED
-    assert session.policy.goal == "help the child get ready for bed"
+    assert session.policy_snapshot.goal == "help the child get ready for bed"
     assert store.get_by_voice_session_id(session.voice_session_id) == session
     assert store.get_by_call_session_id("call-1") == session
 
