@@ -19,8 +19,11 @@ class ConnectionClaims(BaseModel):
     call_session_id: str = Field(alias="callSessionId")
     user_id: str = Field(alias="userId")
     scope: tuple[str, ...]
+    # 토큰을 한 번만 사용할 수 있게 추적하는 고유 식별자다.
     jti: str
+    # 토큰이 발급된 시각이다. Unix 초 단위로 표현한다.
     iat: int
+    # 토큰이 더 이상 유효하지 않은 만료 시각이다. Unix 초 단위다.
     exp: int
 
 
