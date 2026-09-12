@@ -1,4 +1,5 @@
 import json
+import wave
 from pathlib import Path
 
 import nbformat
@@ -8,12 +9,13 @@ from nbclient import NotebookClient
 NOTEBOOK_PATH = Path("notebooks/voice_persona_scenario_evaluation.ipynb")
 
 
-def test_evaluation_notebook_runs_four_combinations_with_two_variants(
+def test_evaluation_notebook_runs_four_combinations_with_one_run_each(
     tmp_path,
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("ONCUE_EVALUATION_PROVIDER", "fake")
     monkeypatch.setenv("ONCUE_EVALUATION_ARTIFACT_ROOT", str(tmp_path))
+    monkeypatch.setenv("ONCUE_EVALUATION_AUDIO_PATH", "")
 
     notebook = nbformat.read(NOTEBOOK_PATH, as_version=4)
     client = NotebookClient(
@@ -25,10 +27,15 @@ def test_evaluation_notebook_runs_four_combinations_with_two_variants(
 
     client.execute()
 
-    run_files = sorted(tmp_path.glob("*/*/run.json"))
-    assert len(run_files) == 8
+    run_files = sorted(tmp_path.glob("*/*/artifacts/run.json"))
+    assert len(run_files) == 4
     for run_file in run_files:
         run_data = json.loads(run_file.read_text(encoding="utf-8"))
         assert run_data["succeeded"] is True
+        assert "variantId" not in run_data
         provider_config = run_file.parent / "provider-config.json"
         assert "apiKey" not in provider_config.read_text(encoding="utf-8")
+        input_wav = run_file.parent.parent / "input" / "input.wav"
+        with wave.open(str(input_wav), "rb") as audio:
+            assert audio.getframerate() == 24_000
+            assert audio.getnchannels() == 1

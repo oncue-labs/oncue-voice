@@ -43,8 +43,6 @@ async def test_realtime_evaluation_service_writes_audio_and_transcript_artifacts
     )
     service = RealtimeEvaluationService(provider)
     request = RealtimeEvaluationRequest(
-        run_id="run-001",
-        variant_id="variant-a",
         combination_key="santa-child-roleplay",
         input_text="잘 준비했어요",
         policy=create_policy(),
@@ -60,9 +58,13 @@ async def test_realtime_evaluation_service_writes_audio_and_transcript_artifacts
     result = await service.run(request)
 
     assert result.succeeded is True
+    run_directory = tmp_path / "santa-child-roleplay" / "run-001"
+    assert result.artifact_directory == run_directory / "artifacts"
+    assert (run_directory / "input" / "input.pcm").read_bytes() == request.input_audio
     assert (result.artifact_directory / "response.wav").read_bytes().startswith(b"RIFF")
     run_data = json.loads((result.artifact_directory / "run.json").read_text())
     assert run_data["evaluationPath"] == "realtime"
+    assert "variantId" not in run_data
     assert run_data["audioBytes"] == len(b"pcm-audio")
     transcript_data = json.loads(
         (result.artifact_directory / "transcript.json").read_text()
@@ -92,8 +94,6 @@ async def test_realtime_evaluation_service_marks_provider_error_as_failed(tmp_pa
         FakeRealtimeProvider((RealtimeEvent(type="error", message="failed"),))
     )
     request = RealtimeEvaluationRequest(
-        run_id="run-002",
-        variant_id="variant-a",
         combination_key="santa-child-roleplay",
         input_text="synthetic input",
         policy=create_policy(),

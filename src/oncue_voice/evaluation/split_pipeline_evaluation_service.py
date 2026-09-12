@@ -12,6 +12,10 @@ from oncue_voice.conversation.split_pipeline_runtime import (
     SplitPipelineRuntime,
     SplitPipelineRuntimeOptions,
 )
+from oncue_voice.evaluation.paths import (
+    EvaluationRunPaths,
+    allocate_evaluation_run,
+)
 from oncue_voice.providers.split_pipeline.factory import ProviderFactory
 from oncue_voice.providers.split_pipeline.models import ProviderSettings
 
@@ -23,8 +27,6 @@ PCM_CHANNEL_COUNT = 1
 
 @dataclass(frozen=True)
 class SplitPipelineEvaluationRequest:
-    run_id: str
-    variant_id: str
     combination_key: str
     input_text: str
     policy: DialoguePolicy
@@ -47,6 +49,10 @@ class SplitPipelineEvaluationService:
         self,
         request: SplitPipelineEvaluationRequest,
     ) -> SplitPipelineEvaluationResult:
+        paths = allocate_evaluation_run(
+            request.artifact_root,
+            request.combination_key,
+        )
         providers = self._provider_factory.create(request.provider_settings)
         conversation_events: list[ConversationEvent] = []
         runtime = SplitPipelineRuntime(
@@ -58,7 +64,7 @@ class SplitPipelineEvaluationService:
             [
                 chunk
                 async for chunk in runtime.run(
-                    request.run_id,
+                    paths.run_id,
                     request.policy,
                     self._input_audio(request.input_audio),
                 )
@@ -66,17 +72,15 @@ class SplitPipelineEvaluationService:
         )
         elapsed_ms = round((time.perf_counter() - started_at) * 1000)
 
-        artifact_directory = request.artifact_root / request.run_id / request.variant_id
-        artifact_directory.mkdir(parents=True, exist_ok=True)
         self._write_artifacts(
             request,
-            artifact_directory,
+            paths,
             conversation_events,
             response_audio,
             elapsed_ms,
         )
         return SplitPipelineEvaluationResult(
-            artifact_directory=artifact_directory,
+            artifact_directory=paths.artifact_directory,
             succeeded=True,
         )
 
@@ -88,16 +92,17 @@ class SplitPipelineEvaluationService:
     def _write_artifacts(
         cls,
         request: SplitPipelineEvaluationRequest,
-        artifact_directory: Path,
+        paths: EvaluationRunPaths,
         conversation_events: list[ConversationEvent],
         response_audio: bytes,
         elapsed_ms: int,
     ) -> None:
+        cls._write_input(paths, request)
+        artifact_directory = paths.artifact_directory
         cls._write_json(
             artifact_directory / "run.json",
             {
-                "runId": request.run_id,
-                "variantId": request.variant_id,
+                "runId": paths.run_id,
                 "combinationKey": request.combination_key,
                 "provider": request.provider_settings.provider,
                 "createdAt": datetime.now(timezone.utc).isoformat(),
@@ -119,10 +124,11 @@ class SplitPipelineEvaluationService:
             ),
         )
         cls._write_json(
-            artifact_directory / "input.json",
+            paths.input_directory / "input.json",
             {
                 "combinationKey": request.combination_key,
                 "inputText": request.input_text,
+                "inputAudioFile": "input.wav",
                 "source": "synthetic",
             },
         )
@@ -140,6 +146,13 @@ class SplitPipelineEvaluationService:
             cls._evaluation_template(request),
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _write_input(
+        paths: EvaluationRunPaths,
+        request: SplitPipelineEvaluationRequest,
+    ) -> None:
+        (paths.input_directory / "input.wav").write_bytes(request.input_audio)
 
     @staticmethod
     def _write_json(path: Path, value: object) -> None:
@@ -160,8 +173,6 @@ class SplitPipelineEvaluationService:
     def _evaluation_template(request: SplitPipelineEvaluationRequest) -> str:
         return f"""# Voice evaluation
 
-- Run: `{request.run_id}`
-- Variant: `{request.variant_id}`
 - Combination: `{request.combination_key}`
 
 ## Manual scores (1–5)

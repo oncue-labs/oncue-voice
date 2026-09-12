@@ -8,6 +8,7 @@ from pathlib import Path
 
 from oncue_voice.conversation.models import DialoguePolicy
 from oncue_voice.conversation.realtime_runtime import RealtimeRuntime
+from oncue_voice.evaluation.paths import EvaluationRunPaths, allocate_evaluation_run
 from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
@@ -22,8 +23,6 @@ PCM_CHANNEL_COUNT = 1
 
 @dataclass(frozen=True)
 class RealtimeEvaluationRequest:
-    run_id: str
-    variant_id: str
     combination_key: str
     input_text: str
     policy: DialoguePolicy
@@ -47,12 +46,16 @@ class RealtimeEvaluationService:
         self,
         request: RealtimeEvaluationRequest,
     ) -> RealtimeEvaluationResult:
+        paths = allocate_evaluation_run(
+            request.artifact_root,
+            request.combination_key,
+        )
         runtime = RealtimeRuntime(self._provider)
         started_at = time.perf_counter()
         events: list[RealtimeEvent] = []
         first_audio_delta_ms: int | None = None
         async for event in runtime.run(
-            request.run_id,
+            paths.run_id,
             request.policy,
             self._input_audio(request.input_audio),
             request.session_options,
@@ -67,13 +70,9 @@ class RealtimeEvaluationService:
             event.audio or b"" for event in events if event.type == "audio_delta"
         )
         succeeded = not any(event.type == "error" for event in events)
-        artifact_directory = (
-            request.artifact_root / request.run_id / request.variant_id
-        )
-        artifact_directory.mkdir(parents=True, exist_ok=True)
         self._write_artifacts(
             request,
-            artifact_directory,
+            paths,
             events,
             response_audio,
             round((time.perf_counter() - started_at) * 1000),
@@ -81,7 +80,7 @@ class RealtimeEvaluationService:
             succeeded,
         )
         return RealtimeEvaluationResult(
-            artifact_directory=artifact_directory,
+            artifact_directory=paths.artifact_directory,
             succeeded=succeeded,
         )
 
@@ -93,18 +92,19 @@ class RealtimeEvaluationService:
     def _write_artifacts(
         cls,
         request: RealtimeEvaluationRequest,
-        artifact_directory: Path,
+        paths: EvaluationRunPaths,
         events: list[RealtimeEvent],
         response_audio: bytes,
         elapsed_ms: int,
         first_audio_delta_ms: int | None,
         succeeded: bool,
     ) -> None:
+        cls._write_input(paths, request)
+        artifact_directory = paths.artifact_directory
         cls._write_json(
             artifact_directory / "run.json",
             {
-                "runId": request.run_id,
-                "variantId": request.variant_id,
+                "runId": paths.run_id,
                 "combinationKey": request.combination_key,
                 "provider": request.provider,
                 "evaluationPath": "realtime",
@@ -128,10 +128,11 @@ class RealtimeEvaluationService:
             ),
         )
         cls._write_json(
-            artifact_directory / "input.json",
+            paths.input_directory / "input.json",
             {
                 "combinationKey": request.combination_key,
                 "inputText": request.input_text,
+                "inputAudioFile": "input.pcm",
                 "source": "synthetic",
             },
         )
@@ -155,6 +156,13 @@ class RealtimeEvaluationService:
         )
 
     @staticmethod
+    def _write_input(
+        paths: EvaluationRunPaths,
+        request: RealtimeEvaluationRequest,
+    ) -> None:
+        (paths.input_directory / "input.pcm").write_bytes(request.input_audio)
+
+    @staticmethod
     def _write_json(path: Path, value: object) -> None:
         path.write_text(
             json.dumps(value, ensure_ascii=False, indent=2) + "\n",
@@ -173,8 +181,6 @@ class RealtimeEvaluationService:
     def _evaluation_template(request: RealtimeEvaluationRequest) -> str:
         return f"""# Realtime voice evaluation
 
-- Run: `{request.run_id}`
-- Variant: `{request.variant_id}`
 - Combination: `{request.combination_key}`
 - Path: `realtime`
 

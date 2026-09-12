@@ -63,8 +63,6 @@ def create_fake_factory() -> ProviderFactory:
 async def test_split_pipeline_evaluation_service_writes_reproducible_local_artifacts(tmp_path) -> None:
     service = SplitPipelineEvaluationService(create_fake_factory())
     request = SplitPipelineEvaluationRequest(
-        run_id="run-001",
-        variant_id="variant-a",
         combination_key="santa-child-roleplay",
         input_text="잘 준비했어요",
         policy=create_policy(),
@@ -80,21 +78,23 @@ async def test_split_pipeline_evaluation_service_writes_reproducible_local_artif
 
     result = await service.run(request)
 
-    assert result.artifact_directory == tmp_path / "run-001" / "variant-a"
+    run_directory = tmp_path / "santa-child-roleplay" / "run-001"
+    assert result.artifact_directory == run_directory / "artifacts"
     expected_files = {
         "run.json",
         "policy-snapshot.json",
         "provider-config.json",
-        "input.json",
         "transcript.json",
         "response.wav",
         "evaluation.md",
     }
     assert {path.name for path in result.artifact_directory.iterdir()} == expected_files
+    assert (run_directory / "input" / "input.json").exists()
+    assert (run_directory / "input" / "input.wav").read_bytes() == request.input_audio
 
     run_data = json.loads((result.artifact_directory / "run.json").read_text())
     assert run_data["runId"] == "run-001"
-    assert run_data["variantId"] == "variant-a"
+    assert "variantId" not in run_data
     assert run_data["succeeded"] is True
 
     policy_data = json.loads(
@@ -117,3 +117,33 @@ async def test_split_pipeline_evaluation_service_writes_reproducible_local_artif
         {"type": "assistant_chunk", "text": "잘 자요", "sequence": 0},
     ]
     assert (result.artifact_directory / "response.wav").read_bytes().startswith(b"RIFF")
+
+
+@pytest.mark.asyncio
+async def test_split_pipeline_evaluation_service_increments_run_id_per_combination(
+    tmp_path,
+) -> None:
+    service = SplitPipelineEvaluationService(create_fake_factory())
+    request = SplitPipelineEvaluationRequest(
+        combination_key="santa-child-roleplay",
+        input_text="잘 준비했어요",
+        policy=create_policy(),
+        provider_settings=ProviderSettings(
+            provider="fake",
+            llm_model="fake-llm",
+            stt_model="fake-stt",
+            tts_voice_id="fake-voice",
+        ),
+        input_audio=b"synthetic-input-audio",
+        artifact_root=tmp_path,
+    )
+
+    first = await service.run(request)
+    second = await service.run(request)
+
+    assert first.artifact_directory == (
+        tmp_path / "santa-child-roleplay" / "run-001" / "artifacts"
+    )
+    assert second.artifact_directory == (
+        tmp_path / "santa-child-roleplay" / "run-002" / "artifacts"
+    )
