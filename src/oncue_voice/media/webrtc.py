@@ -1,11 +1,20 @@
 import asyncio
 from typing import Any, Protocol
 
-from aiortc import RTCIceCandidate, RTCPeerConnection, RTCSessionDescription
+from collections.abc import Callable
+
+from aiortc import (
+    RTCConfiguration,
+    RTCIceCandidate,
+    RTCIceServer,
+    RTCPeerConnection,
+    RTCSessionDescription,
+)
 from aiortc.mediastreams import MediaStreamError
 from aiortc.sdp import candidate_from_sdp
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from oncue_voice.config import TurnSettings
 from oncue_voice.media.audio import (
     AudioRuntimeBridge,
     PcmAudioInput,
@@ -63,6 +72,26 @@ class PeerConnection(Protocol):
 
     async def close(self) -> None:
         """Close the peer connection."""
+
+
+def create_peer_connection_factory(
+    turn_settings: TurnSettings,
+) -> Callable[[], RTCPeerConnection]:
+    """Create peer connections using the service's coturn credentials."""
+
+    def create_peer_connection() -> RTCPeerConnection:
+        configuration = RTCConfiguration(
+            iceServers=[
+                RTCIceServer(
+                    urls=list(turn_settings.urls),
+                    username=turn_settings.username,
+                    credential=turn_settings.credential,
+                )
+            ]
+        )
+        return RTCPeerConnection(configuration=configuration)
+
+    return create_peer_connection
 
 
 class WebRtcSession:
@@ -128,7 +157,8 @@ class WebRtcSession:
         self._closed = True
         if self._audio_input is not None:
             await self._audio_input.close()
-        if self._runtime_task is not None:
+        current_task = asyncio.current_task()
+        if self._runtime_task is not None and self._runtime_task is not current_task:
             if not self._runtime_task.done():
                 self._runtime_task.cancel()
             try:

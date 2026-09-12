@@ -4,7 +4,11 @@ import pytest
 from aiortc.mediastreams import MediaStreamError
 from av import AudioFrame
 
-from oncue_voice.media.audio import PcmAudioInput, PcmAudioOutputTrack
+from oncue_voice.media.audio import (
+    AudioRuntimeBridge,
+    PcmAudioInput,
+    PcmAudioOutputTrack,
+)
 from oncue_voice.providers.realtime.models import RealtimeEvent
 
 
@@ -62,6 +66,7 @@ async def test_audio_output_track_raises_stream_error_after_close() -> None:
 async def test_audio_runtime_bridge_forwards_split_and_realtime_audio() -> None:
     audio_input = PcmAudioInput(sample_rate=24_000)
     audio_output = PcmAudioOutputTrack(sample_rate=24_000)
+    completed = []
 
     async def runtime(audio):
         received = [chunk async for chunk in audio]
@@ -69,9 +74,12 @@ async def test_audio_runtime_bridge_forwards_split_and_realtime_audio() -> None:
         yield b"\x08\x00" * 2
         yield RealtimeEvent(type="audio_delta", audio=b"\x09\x00" * 2)
 
-    from oncue_voice.media.audio import AudioRuntimeBridge
-
-    bridge = AudioRuntimeBridge(runtime, audio_input, audio_output)
+    bridge = AudioRuntimeBridge(
+        runtime,
+        audio_input,
+        audio_output,
+        on_complete=lambda: completed.append("completed"),
+    )
     bridge_task = asyncio.create_task(bridge.run())
     await audio_input.push_frame(
         create_mono_pcm_frame(sample_rate=24_000, samples=2, value=7)
@@ -83,5 +91,31 @@ async def test_audio_runtime_bridge_forwards_split_and_realtime_audio() -> None:
     second_frame = await audio_output.recv()
     assert bytes(first_frame.planes[0])[:4] == b"\x08\x00" * 2
     assert bytes(second_frame.planes[0])[:4] == b"\x09\x00" * 2
+    with pytest.raises(MediaStreamError):
+        await audio_output.recv()
+    assert completed == ["completed"]
+
+
+@pytest.mark.anyio
+async def test_audio_runtime_bridge_reports_realtime_provider_error() -> None:
+    audio_input = PcmAudioInput(sample_rate=24_000)
+    audio_output = PcmAudioOutputTrack(sample_rate=24_000)
+    errors = []
+
+    async def runtime(audio):
+        yield RealtimeEvent(type="error", message="provider failed")
+        if False:
+            yield b""
+
+    bridge = AudioRuntimeBridge(
+        runtime,
+        audio_input,
+        audio_output,
+        on_provider_error=lambda: errors.append("provider"),
+    )
+
+    await bridge.run()
+
+    assert errors == ["provider"]
     with pytest.raises(MediaStreamError):
         await audio_output.recv()

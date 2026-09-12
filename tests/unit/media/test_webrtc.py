@@ -6,7 +6,13 @@ from aiortc.mediastreams import MediaStreamError
 from av import AudioFrame
 
 from oncue_voice.media.audio import PcmAudioInput, PcmAudioOutputTrack
-from oncue_voice.media.webrtc import IceCandidate, SdpOffer, WebRtcSession
+from oncue_voice.config import TurnSettings
+from oncue_voice.media.webrtc import (
+    IceCandidate,
+    SdpOffer,
+    WebRtcSession,
+    create_peer_connection_factory,
+)
 
 
 class FakePeerConnection:
@@ -155,3 +161,24 @@ async def test_accept_offer_starts_runtime_and_close_cancels_it() -> None:
     await session.close()
 
     assert runtime_bridge.cancelled is True
+
+
+@pytest.mark.anyio
+async def test_peer_connection_factory_configures_coturn_ice_server() -> None:
+    factory = create_peer_connection_factory(
+        TurnSettings(
+            urls=("turn:turn.example:3478?transport=udp",),
+            username="temporary-user",
+            credential="temporary-credential",
+        )
+    )
+
+    peer = factory()
+    try:
+        configuration = peer.__dict__["_RTCPeerConnection__configuration"]
+        ice_server = configuration.iceServers[0]
+        assert ice_server.urls == ["turn:turn.example:3478?transport=udp"]
+        assert ice_server.username == "temporary-user"
+        assert ice_server.credential == "temporary-credential"
+    finally:
+        await peer.close()

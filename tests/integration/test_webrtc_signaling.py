@@ -14,6 +14,7 @@ from oncue_voice.api.signaling import (
 )
 from oncue_voice.media.webrtc import SdpAnswer
 from oncue_voice.session.auth import ConnectionTokenVerifier
+from oncue_voice.session.lifecycle import CallTerminationReason
 from oncue_voice.session.store import InMemoryJtiStore
 
 
@@ -52,6 +53,7 @@ class FakeSignalingSession:
         self.candidates = []
         self.offers = []
         self.closed = False
+        self.finished = []
 
     async def accept_offer(self, offer):
         self.offers.append(offer)
@@ -62,6 +64,9 @@ class FakeSignalingSession:
 
     async def close(self) -> None:
         self.closed = True
+
+    async def finish(self, reason) -> None:
+        self.finished.append(reason)
 
 
 class FakeSignalingSessionFactory:
@@ -124,6 +129,7 @@ def test_signaling_forwards_ice_candidate_and_closes_on_hangup() -> None:
 
     assert factory.session.candidates[0].sdp_mid == "0"
     assert factory.session.closed is True
+    assert factory.session.finished == [CallTerminationReason.USER_HANGUP]
 
 
 def test_signaling_rejects_missing_connection_token() -> None:
@@ -174,3 +180,4 @@ def test_signaling_closes_session_after_abnormal_disconnect() -> None:
         websocket.close(code=1001)
 
     assert factory.session.closed is True
+    assert factory.session.finished == [CallTerminationReason.ABNORMAL_DISCONNECT]

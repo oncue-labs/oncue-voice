@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from collections.abc import AsyncIterator, Callable
 from fractions import Fraction
 
@@ -14,6 +15,7 @@ RuntimeAudioRunner = Callable[
     [AsyncIterator[bytes]],
     AsyncIterator[RuntimeAudioEvent],
 ]
+RuntimeCallback = Callable[[], object]
 
 
 class PcmAudioInput:
@@ -107,19 +109,42 @@ class AudioRuntimeBridge:
         runtime: RuntimeAudioRunner,
         audio_input: PcmAudioInput,
         audio_output: PcmAudioOutputTrack,
+        *,
+        on_complete: RuntimeCallback | None = None,
+        on_provider_error: RuntimeCallback | None = None,
     ) -> None:
         self._runtime = runtime
         self._audio_input = audio_input
         self._audio_output = audio_output
+        self._on_complete = on_complete
+        self._on_provider_error = on_provider_error
 
     async def run(self) -> None:
         try:
             async for event in self._runtime(self._audio_input.chunks()):
+                if isinstance(event, RealtimeEvent) and event.type == "error":
+                    await self._notify(self._on_provider_error)
+                    return
                 pcm = self._audio_bytes(event)
                 if pcm:
                     await self._audio_output.push_pcm(pcm)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await self._notify(self._on_provider_error)
+            raise
+        else:
+            await self._notify(self._on_complete)
         finally:
             await self._audio_output.close()
+
+    @staticmethod
+    async def _notify(callback: RuntimeCallback | None) -> None:
+        if callback is None:
+            return
+        result = callback()
+        if inspect.isawaitable(result):
+            await result
 
     @staticmethod
     def _audio_bytes(event: RuntimeAudioEvent) -> bytes | None:
