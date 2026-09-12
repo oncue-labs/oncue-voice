@@ -13,14 +13,14 @@ from openai import (
 
 from oncue_voice.conversation.models import DialoguePolicy
 from oncue_voice.conversation.policy_renderer import render_dialogue_policy
-from oncue_voice.providers.errors import (
+from oncue_voice.providers.common.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderRequestError,
     ProviderResponseError,
     ProviderTimeoutError,
 )
-from oncue_voice.providers.realtime_models import (
+from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
 )

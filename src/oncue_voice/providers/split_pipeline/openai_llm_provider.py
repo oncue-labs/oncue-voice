@@ -12,7 +12,7 @@ from openai import (
 
 from oncue_voice.conversation.models import AssistantChunk, DialoguePolicy, UserTurn
 from oncue_voice.conversation.policy_renderer import render_dialogue_policy
-from oncue_voice.providers.errors import (
+from oncue_voice.providers.common.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderRequestError,

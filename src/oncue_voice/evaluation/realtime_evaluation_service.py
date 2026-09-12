@@ -6,14 +6,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from oncue_voice.conversation.events import ConversationEvent
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.conversation.runtime import (
-    ConversationRuntime,
-    ConversationRuntimeOptions,
+from oncue_voice.conversation.realtime_runtime import RealtimeRuntime
+from oncue_voice.providers.realtime.models import (
+    RealtimeEvent,
+    RealtimeSessionOptions,
 )
-from oncue_voice.providers.factory import ProviderFactory
-from oncue_voice.providers.models import ProviderSettings
+from oncue_voice.providers.realtime.provider import RealtimeProvider
 
 
 PCM_SAMPLE_RATE_HZ = 24_000
@@ -22,57 +21,69 @@ PCM_CHANNEL_COUNT = 1
 
 
 @dataclass(frozen=True)
-class EvaluationRequest:
+class RealtimeEvaluationRequest:
     run_id: str
     variant_id: str
     combination_key: str
     input_text: str
     policy: DialoguePolicy
-    provider_settings: ProviderSettings
+    session_options: RealtimeSessionOptions
     input_audio: bytes
     artifact_root: Path
+    provider: str = "openai"
 
 
 @dataclass(frozen=True)
-class EvaluationResult:
+class RealtimeEvaluationResult:
     artifact_directory: Path
     succeeded: bool
 
 
-class EvaluationService:
-    def __init__(self, provider_factory: ProviderFactory) -> None:
-        self._provider_factory = provider_factory
+class RealtimeEvaluationService:
+    def __init__(self, provider: RealtimeProvider) -> None:
+        self._provider = provider
 
-    async def run(self, request: EvaluationRequest) -> EvaluationResult:
-        providers = self._provider_factory.create(request.provider_settings)
-        conversation_events: list[ConversationEvent] = []
-        runtime = ConversationRuntime(
-            providers,
-            ConversationRuntimeOptions(event_sink=conversation_events.append),
-        )
+    async def run(
+        self,
+        request: RealtimeEvaluationRequest,
+    ) -> RealtimeEvaluationResult:
+        runtime = RealtimeRuntime(self._provider)
         started_at = time.perf_counter()
-        response_audio = b"".join(
-            [
-                chunk
-                async for chunk in runtime.run(
-                    request.run_id,
-                    request.policy,
-                    self._input_audio(request.input_audio),
+        events: list[RealtimeEvent] = []
+        first_audio_delta_ms: int | None = None
+        async for event in runtime.run(
+            request.run_id,
+            request.policy,
+            self._input_audio(request.input_audio),
+            request.session_options,
+        ):
+            events.append(event)
+            if event.type == "audio_delta" and first_audio_delta_ms is None:
+                first_audio_delta_ms = round(
+                    (time.perf_counter() - started_at) * 1000
                 )
-            ]
-        )
-        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
 
-        artifact_directory = request.artifact_root / request.run_id / request.variant_id
+        response_audio = b"".join(
+            event.audio or b"" for event in events if event.type == "audio_delta"
+        )
+        succeeded = not any(event.type == "error" for event in events)
+        artifact_directory = (
+            request.artifact_root / request.run_id / request.variant_id
+        )
         artifact_directory.mkdir(parents=True, exist_ok=True)
         self._write_artifacts(
             request,
             artifact_directory,
-            conversation_events,
+            events,
             response_audio,
-            elapsed_ms,
+            round((time.perf_counter() - started_at) * 1000),
+            first_audio_delta_ms,
+            succeeded,
         )
-        return EvaluationResult(artifact_directory=artifact_directory, succeeded=True)
+        return RealtimeEvaluationResult(
+            artifact_directory=artifact_directory,
+            succeeded=succeeded,
+        )
 
     @staticmethod
     async def _input_audio(audio: bytes) -> AsyncIterator[bytes]:
@@ -81,11 +92,13 @@ class EvaluationService:
     @classmethod
     def _write_artifacts(
         cls,
-        request: EvaluationRequest,
+        request: RealtimeEvaluationRequest,
         artifact_directory: Path,
-        conversation_events: list[ConversationEvent],
+        events: list[RealtimeEvent],
         response_audio: bytes,
         elapsed_ms: int,
+        first_audio_delta_ms: int | None,
+        succeeded: bool,
     ) -> None:
         cls._write_json(
             artifact_directory / "run.json",
@@ -93,10 +106,12 @@ class EvaluationService:
                 "runId": request.run_id,
                 "variantId": request.variant_id,
                 "combinationKey": request.combination_key,
-                "provider": request.provider_settings.provider,
+                "provider": request.provider,
+                "evaluationPath": "realtime",
                 "createdAt": datetime.now(timezone.utc).isoformat(),
-                "succeeded": True,
+                "succeeded": succeeded,
                 "elapsedMs": elapsed_ms,
+                "firstAudioDeltaMs": first_audio_delta_ms,
                 "audioBytes": len(response_audio),
             },
         )
@@ -106,7 +121,7 @@ class EvaluationService:
         )
         cls._write_json(
             artifact_directory / "provider-config.json",
-            request.provider_settings.model_dump(
+            request.session_options.model_dump(
                 mode="json",
                 by_alias=True,
                 exclude_none=True,
@@ -124,8 +139,12 @@ class EvaluationService:
             artifact_directory / "transcript.json",
             {
                 "events": [
-                    event.model_dump(mode="json", exclude_none=False)
-                    for event in conversation_events
+                    event.model_dump(
+                        mode="json",
+                        exclude={"audio"},
+                        exclude_none=False,
+                    )
+                    for event in events
                 ]
             },
         )
@@ -151,18 +170,20 @@ class EvaluationService:
             output.writeframes(audio)
 
     @staticmethod
-    def _evaluation_template(request: EvaluationRequest) -> str:
-        return f"""# Voice evaluation
+    def _evaluation_template(request: RealtimeEvaluationRequest) -> str:
+        return f"""# Realtime voice evaluation
 
 - Run: `{request.run_id}`
 - Variant: `{request.variant_id}`
 - Combination: `{request.combination_key}`
+- Path: `realtime`
 
 ## Manual scores (1–5)
 
 - Voice quality:
 - Persona consistency:
 - Scenario goal:
+- Interruption handling:
 - Safety: pass / violation
 
 ## Comments

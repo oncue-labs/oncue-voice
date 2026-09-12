@@ -3,12 +3,12 @@ import json
 import pytest
 
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.evaluation.realtime_service import (
+from oncue_voice.evaluation.realtime_evaluation_service import (
     RealtimeEvaluationRequest,
     RealtimeEvaluationService,
 )
-from oncue_voice.providers.fake_realtime_provider import FakeRealtimeProvider
-from oncue_voice.providers.realtime_models import (
+from oncue_voice.providers.realtime.fake_provider import FakeRealtimeProvider
+from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
 )

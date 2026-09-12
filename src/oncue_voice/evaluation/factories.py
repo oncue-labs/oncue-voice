@@ -1,23 +1,30 @@
-from oncue_voice.evaluation.service import EvaluationService
-from oncue_voice.providers.fake_realtime_provider import FakeRealtimeProvider
-from oncue_voice.providers.fake_llm_provider import FakeLlmProvider
-from oncue_voice.providers.fake_stt_provider import FakeSttProvider
-from oncue_voice.providers.fake_tts_provider import FakeTtsProvider
-from oncue_voice.providers.factory import (
+from oncue_voice.evaluation.split_pipeline_evaluation_service import (
+    SplitPipelineEvaluationService,
+)
+from oncue_voice.providers.realtime.factory import create_openai_realtime_provider
+from oncue_voice.providers.realtime.fake_provider import FakeRealtimeProvider
+from oncue_voice.providers.realtime.models import RealtimeEvent
+from oncue_voice.providers.realtime.provider import RealtimeProvider
+from oncue_voice.providers.split_pipeline.factory import (
     ProviderFactory,
     create_openai_factory,
-    create_openai_realtime_provider,
 )
-from oncue_voice.providers.models import ProviderBundle, ProviderCapabilities
-from oncue_voice.providers.realtime_models import RealtimeEvent
-from oncue_voice.providers.realtime_provider import RealtimeProvider
+from oncue_voice.providers.split_pipeline.fake_llm_provider import FakeLlmProvider
+from oncue_voice.providers.split_pipeline.fake_stt_provider import FakeSttProvider
+from oncue_voice.providers.split_pipeline.fake_tts_provider import FakeTtsProvider
+from oncue_voice.providers.split_pipeline.models import (
+    ProviderBundle,
+    ProviderCapabilities,
+)
 
 
-def create_evaluation_service(provider: str) -> EvaluationService:
+def create_split_pipeline_evaluation_service(
+    provider: str,
+) -> SplitPipelineEvaluationService:
     if provider == "fake":
-        return EvaluationService(create_fake_factory())
+        return SplitPipelineEvaluationService(create_fake_factory())
     if provider == "openai":
-        return EvaluationService(create_openai_factory())
+        return SplitPipelineEvaluationService(create_openai_factory())
     raise ValueError(f"Unsupported evaluation provider: {provider}")
 
 

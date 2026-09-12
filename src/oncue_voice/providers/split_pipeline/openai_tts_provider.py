@@ -10,7 +10,7 @@ from openai import (
     RateLimitError,
 )
 
-from oncue_voice.providers.errors import (
+from oncue_voice.providers.common.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderRequestError,

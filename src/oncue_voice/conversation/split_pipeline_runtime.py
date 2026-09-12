@@ -8,26 +8,26 @@ from oncue_voice.conversation.models import (
     TranscriptSegment,
     UserTurn,
 )
-from oncue_voice.providers.models import ProviderBundle
+from oncue_voice.providers.split_pipeline.models import ProviderBundle
 
 
 MAX_CALL_DURATION_SECONDS = 300.0
 
 
 @dataclass(frozen=True)
-class ConversationRuntimeOptions:
+class SplitPipelineRuntimeOptions:
     clock: Callable[[], float] = time.monotonic
     max_duration_seconds: float = MAX_CALL_DURATION_SECONDS
     event_sink: Callable[[ConversationEvent], None] | None = None
 
 
-class ConversationRuntime:
+class SplitPipelineRuntime:
     def __init__(
         self,
         providers: ProviderBundle,
-        options: ConversationRuntimeOptions | None = None,
+        options: SplitPipelineRuntimeOptions | None = None,
     ) -> None:
-        runtime_options = options or ConversationRuntimeOptions()
+        runtime_options = options or SplitPipelineRuntimeOptions()
         self._providers = providers
         self._clock = runtime_options.clock
         self._max_duration_seconds = runtime_options.max_duration_seconds

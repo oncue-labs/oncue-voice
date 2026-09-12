@@ -3,25 +3,25 @@ from types import SimpleNamespace
 import pytest
 
 from oncue_voice.conversation.models import AssistantChunk, DialoguePolicy, UserTurn
-from oncue_voice.providers.openai_llm_provider import (
+from oncue_voice.providers.split_pipeline.openai_llm_provider import (
     OpenAiLlmProvider,
     OpenAiLlmSettings,
 )
-from oncue_voice.providers.openai_stt_provider import (
+from oncue_voice.providers.split_pipeline.openai_stt_provider import (
     OpenAiSttProvider,
     OpenAiSttSettings,
 )
-from oncue_voice.providers.openai_tts_provider import (
+from oncue_voice.providers.split_pipeline.openai_tts_provider import (
     OpenAiTtsProvider,
     OpenAiTtsSettings,
 )
-from oncue_voice.providers.errors import (
+from oncue_voice.providers.common.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderTimeoutError,
 )
-from oncue_voice.providers.factory import create_openai_factory
-from oncue_voice.providers.models import ProviderSettings
+from oncue_voice.providers.split_pipeline.factory import create_openai_factory
+from oncue_voice.providers.split_pipeline.models import ProviderSettings
 
 
 async def events_stream(events):

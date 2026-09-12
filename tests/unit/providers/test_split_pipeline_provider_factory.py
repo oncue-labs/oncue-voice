@@ -1,11 +1,11 @@
 import pytest
 
-from oncue_voice.providers.factory import (
+from oncue_voice.providers.split_pipeline.factory import (
     ProviderFactory,
     UnsupportedProviderError,
     UnsupportedProviderSettingError,
 )
-from oncue_voice.providers.models import (
+from oncue_voice.providers.split_pipeline.models import (
     ProviderBundle,
     ProviderCapabilities,
     ProviderSettings,

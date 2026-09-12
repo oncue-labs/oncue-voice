@@ -2,8 +2,8 @@ from collections.abc import AsyncIterator
 
 from oncue_voice.conversation.models import DialoguePolicy
 from oncue_voice.conversation.realtime_runtime import RealtimeRuntime
-from oncue_voice.providers.fake_realtime_provider import FakeRealtimeProvider
-from oncue_voice.providers.realtime_models import (
+from oncue_voice.providers.realtime.fake_provider import FakeRealtimeProvider
+from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
 )

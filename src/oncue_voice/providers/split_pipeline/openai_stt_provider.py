@@ -11,7 +11,7 @@ from openai import (
 )
 
 from oncue_voice.conversation.models import TranscriptSegment
-from oncue_voice.providers.errors import (
+from oncue_voice.providers.common.errors import (
     ProviderAuthenticationError,
     ProviderRateLimitError,
     ProviderRequestError,

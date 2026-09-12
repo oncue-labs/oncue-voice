@@ -2,11 +2,11 @@ import asyncio
 from collections.abc import AsyncIterator
 
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.providers.realtime_models import (
+from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
 )
-from oncue_voice.providers.realtime_provider import RealtimeProvider, RealtimeSession
+from oncue_voice.providers.realtime.provider import RealtimeProvider, RealtimeSession
 
 
 class RealtimeRuntime:

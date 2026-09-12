@@ -3,12 +3,19 @@ import json
 import pytest
 
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.evaluation.service import EvaluationRequest, EvaluationService
-from oncue_voice.providers.fake_llm_provider import FakeLlmProvider
-from oncue_voice.providers.fake_stt_provider import FakeSttProvider
-from oncue_voice.providers.fake_tts_provider import FakeTtsProvider
-from oncue_voice.providers.factory import ProviderFactory
-from oncue_voice.providers.models import ProviderBundle, ProviderCapabilities, ProviderSettings
+from oncue_voice.evaluation.split_pipeline_evaluation_service import (
+    SplitPipelineEvaluationRequest,
+    SplitPipelineEvaluationService,
+)
+from oncue_voice.providers.split_pipeline.fake_llm_provider import FakeLlmProvider
+from oncue_voice.providers.split_pipeline.fake_stt_provider import FakeSttProvider
+from oncue_voice.providers.split_pipeline.fake_tts_provider import FakeTtsProvider
+from oncue_voice.providers.split_pipeline.factory import ProviderFactory
+from oncue_voice.providers.split_pipeline.models import (
+    ProviderBundle,
+    ProviderCapabilities,
+    ProviderSettings,
+)
 
 
 def create_policy() -> DialoguePolicy:
@@ -53,9 +60,9 @@ def create_fake_factory() -> ProviderFactory:
 
 
 @pytest.mark.asyncio
-async def test_evaluation_service_writes_reproducible_local_artifacts(tmp_path) -> None:
-    service = EvaluationService(create_fake_factory())
-    request = EvaluationRequest(
+async def test_split_pipeline_evaluation_service_writes_reproducible_local_artifacts(tmp_path) -> None:
+    service = SplitPipelineEvaluationService(create_fake_factory())
+    request = SplitPipelineEvaluationRequest(
         run_id="run-001",
         variant_id="variant-a",
         combination_key="santa-child-roleplay",

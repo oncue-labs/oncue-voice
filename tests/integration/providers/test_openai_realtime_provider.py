@@ -4,9 +4,9 @@ from types import SimpleNamespace
 import pytest
 
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.providers.errors import ProviderResponseError
-from oncue_voice.providers.openai_realtime_provider import OpenAiRealtimeProvider
-from oncue_voice.providers.realtime_models import RealtimeSessionOptions
+from oncue_voice.providers.common.errors import ProviderResponseError
+from oncue_voice.providers.realtime.models import RealtimeSessionOptions
+from oncue_voice.providers.realtime.openai_provider import OpenAiRealtimeProvider
 
 
 class FakeRealtimeConnection:

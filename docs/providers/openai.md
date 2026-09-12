@@ -1,6 +1,6 @@
 # OpenAI provider
 
-OnCue MVP의 기준 Public provider다. `ConversationRuntime`은 OpenAI SDK를 직접 호출하지 않고, 다음 세 adapter를 통해 STT·LLM·TTS를 각각 사용한다.
+OnCue MVP의 기준 Public provider다. `SplitPipelineRuntime`은 OpenAI SDK를 직접 호출하지 않고, 다음 세 adapter를 통해 STT·LLM·TTS를 각각 사용한다.
 
 ## Adapter 구성
 

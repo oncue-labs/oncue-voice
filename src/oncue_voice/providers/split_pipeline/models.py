@@ -4,9 +4,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from oncue_voice.providers.llm_provider import LlmProvider
-from oncue_voice.providers.stt_provider import SttProvider
-from oncue_voice.providers.tts_provider import TtsProvider
+from oncue_voice.providers.split_pipeline.llm_provider import LlmProvider
+from oncue_voice.providers.split_pipeline.stt_provider import SttProvider
+from oncue_voice.providers.split_pipeline.tts_provider import TtsProvider
 
 
 class ProviderSettings(BaseModel):

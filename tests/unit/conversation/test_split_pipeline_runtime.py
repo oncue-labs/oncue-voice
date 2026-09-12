@@ -2,14 +2,14 @@ import pytest
 
 from oncue_voice.conversation.models import DialoguePolicy
 from oncue_voice.conversation.events import ConversationEvent
-from oncue_voice.conversation.runtime import (
-    ConversationRuntime,
-    ConversationRuntimeOptions,
+from oncue_voice.conversation.split_pipeline_runtime import (
+    SplitPipelineRuntime,
+    SplitPipelineRuntimeOptions,
 )
-from oncue_voice.providers.fake_llm_provider import FakeLlmProvider
-from oncue_voice.providers.fake_stt_provider import FakeSttProvider
-from oncue_voice.providers.fake_tts_provider import FakeTtsProvider
-from oncue_voice.providers.models import ProviderBundle
+from oncue_voice.providers.split_pipeline.fake_llm_provider import FakeLlmProvider
+from oncue_voice.providers.split_pipeline.fake_stt_provider import FakeSttProvider
+from oncue_voice.providers.split_pipeline.fake_tts_provider import FakeTtsProvider
+from oncue_voice.providers.split_pipeline.models import ProviderBundle
 
 
 async def audio_chunks() -> bytes:
@@ -55,11 +55,11 @@ def create_bundle(
 
 
 @pytest.mark.asyncio
-async def test_runtime_connects_stt_llm_tts_in_order_and_returns_audio() -> None:
+async def test_split_pipeline_runtime_connects_stt_llm_tts_in_order_and_returns_audio() -> None:
     events: list[str] = []
     bundle = create_bundle(events)
     policy = create_policy()
-    runtime = ConversationRuntime(bundle)
+    runtime = SplitPipelineRuntime(bundle)
 
     result = [
         chunk
@@ -71,10 +71,10 @@ async def test_runtime_connects_stt_llm_tts_in_order_and_returns_audio() -> None
 
 
 @pytest.mark.asyncio
-async def test_runtime_does_not_synthesize_for_forbidden_topic() -> None:
+async def test_split_pipeline_runtime_does_not_synthesize_for_forbidden_topic() -> None:
     events: list[str] = []
     bundle = create_bundle(events, transcript_text="payment details")
-    runtime = ConversationRuntime(bundle)
+    runtime = SplitPipelineRuntime(bundle)
 
     result = [
         chunk
@@ -90,10 +90,10 @@ async def test_runtime_does_not_synthesize_for_forbidden_topic() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_stops_before_processing_audio_after_user_termination() -> None:
+async def test_split_pipeline_runtime_stops_before_processing_audio_after_user_termination() -> None:
     events: list[str] = []
     bundle = create_bundle(events)
-    runtime = ConversationRuntime(bundle)
+    runtime = SplitPipelineRuntime(bundle)
 
     runtime.stop("session-1", "user_hangup")
     result = [
@@ -106,12 +106,12 @@ async def test_runtime_stops_before_processing_audio_after_user_termination() ->
 
 
 @pytest.mark.asyncio
-async def test_runtime_emits_user_and_assistant_events_for_evaluation() -> None:
+async def test_split_pipeline_runtime_emits_user_and_assistant_events_for_evaluation() -> None:
     provider_events: list[str] = []
     conversation_events: list[ConversationEvent] = []
-    runtime = ConversationRuntime(
+    runtime = SplitPipelineRuntime(
         create_bundle(provider_events),
-        ConversationRuntimeOptions(event_sink=conversation_events.append),
+        SplitPipelineRuntimeOptions(event_sink=conversation_events.append),
     )
 
     _ = [
@@ -126,13 +126,13 @@ async def test_runtime_emits_user_and_assistant_events_for_evaluation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_stops_before_synthesis_after_five_minutes() -> None:
+async def test_split_pipeline_runtime_stops_before_synthesis_after_five_minutes() -> None:
     events: list[str] = []
     bundle = create_bundle(events)
     clock_values = iter((0.0, 301.0))
-    runtime = ConversationRuntime(
+    runtime = SplitPipelineRuntime(
         bundle,
-        ConversationRuntimeOptions(clock=lambda: next(clock_values)),
+        SplitPipelineRuntimeOptions(clock=lambda: next(clock_values)),
     )
 
     result = [

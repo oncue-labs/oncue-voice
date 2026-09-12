@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from oncue_voice.conversation.events import ConversationEvent
 from oncue_voice.conversation.models import DialoguePolicy
-from oncue_voice.conversation.realtime_runtime import RealtimeRuntime
-from oncue_voice.providers.realtime_models import (
-    RealtimeEvent,
-    RealtimeSessionOptions,
+from oncue_voice.conversation.split_pipeline_runtime import (
+    SplitPipelineRuntime,
+    SplitPipelineRuntimeOptions,
 )
-from oncue_voice.providers.realtime_provider import RealtimeProvider
+from oncue_voice.providers.split_pipeline.factory import ProviderFactory
+from oncue_voice.providers.split_pipeline.models import ProviderSettings
 
 
 PCM_SAMPLE_RATE_HZ = 24_000
@@ -21,68 +22,62 @@ PCM_CHANNEL_COUNT = 1
 
 
 @dataclass(frozen=True)
-class RealtimeEvaluationRequest:
+class SplitPipelineEvaluationRequest:
     run_id: str
     variant_id: str
     combination_key: str
     input_text: str
     policy: DialoguePolicy
-    session_options: RealtimeSessionOptions
+    provider_settings: ProviderSettings
     input_audio: bytes
     artifact_root: Path
-    provider: str = "openai"
 
 
 @dataclass(frozen=True)
-class RealtimeEvaluationResult:
+class SplitPipelineEvaluationResult:
     artifact_directory: Path
     succeeded: bool
 
 
-class RealtimeEvaluationService:
-    def __init__(self, provider: RealtimeProvider) -> None:
-        self._provider = provider
+class SplitPipelineEvaluationService:
+    def __init__(self, provider_factory: ProviderFactory) -> None:
+        self._provider_factory = provider_factory
 
     async def run(
         self,
-        request: RealtimeEvaluationRequest,
-    ) -> RealtimeEvaluationResult:
-        runtime = RealtimeRuntime(self._provider)
+        request: SplitPipelineEvaluationRequest,
+    ) -> SplitPipelineEvaluationResult:
+        providers = self._provider_factory.create(request.provider_settings)
+        conversation_events: list[ConversationEvent] = []
+        runtime = SplitPipelineRuntime(
+            providers,
+            SplitPipelineRuntimeOptions(event_sink=conversation_events.append),
+        )
         started_at = time.perf_counter()
-        events: list[RealtimeEvent] = []
-        first_audio_delta_ms: int | None = None
-        async for event in runtime.run(
-            request.run_id,
-            request.policy,
-            self._input_audio(request.input_audio),
-            request.session_options,
-        ):
-            events.append(event)
-            if event.type == "audio_delta" and first_audio_delta_ms is None:
-                first_audio_delta_ms = round(
-                    (time.perf_counter() - started_at) * 1000
-                )
-
         response_audio = b"".join(
-            event.audio or b"" for event in events if event.type == "audio_delta"
+            [
+                chunk
+                async for chunk in runtime.run(
+                    request.run_id,
+                    request.policy,
+                    self._input_audio(request.input_audio),
+                )
+            ]
         )
-        succeeded = not any(event.type == "error" for event in events)
-        artifact_directory = (
-            request.artifact_root / request.run_id / request.variant_id
-        )
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+
+        artifact_directory = request.artifact_root / request.run_id / request.variant_id
         artifact_directory.mkdir(parents=True, exist_ok=True)
         self._write_artifacts(
             request,
             artifact_directory,
-            events,
+            conversation_events,
             response_audio,
-            round((time.perf_counter() - started_at) * 1000),
-            first_audio_delta_ms,
-            succeeded,
+            elapsed_ms,
         )
-        return RealtimeEvaluationResult(
+        return SplitPipelineEvaluationResult(
             artifact_directory=artifact_directory,
-            succeeded=succeeded,
+            succeeded=True,
         )
 
     @staticmethod
@@ -92,13 +87,11 @@ class RealtimeEvaluationService:
     @classmethod
     def _write_artifacts(
         cls,
-        request: RealtimeEvaluationRequest,
+        request: SplitPipelineEvaluationRequest,
         artifact_directory: Path,
-        events: list[RealtimeEvent],
+        conversation_events: list[ConversationEvent],
         response_audio: bytes,
         elapsed_ms: int,
-        first_audio_delta_ms: int | None,
-        succeeded: bool,
     ) -> None:
         cls._write_json(
             artifact_directory / "run.json",
@@ -106,12 +99,10 @@ class RealtimeEvaluationService:
                 "runId": request.run_id,
                 "variantId": request.variant_id,
                 "combinationKey": request.combination_key,
-                "provider": request.provider,
-                "evaluationPath": "realtime",
+                "provider": request.provider_settings.provider,
                 "createdAt": datetime.now(timezone.utc).isoformat(),
-                "succeeded": succeeded,
+                "succeeded": True,
                 "elapsedMs": elapsed_ms,
-                "firstAudioDeltaMs": first_audio_delta_ms,
                 "audioBytes": len(response_audio),
             },
         )
@@ -121,7 +112,7 @@ class RealtimeEvaluationService:
         )
         cls._write_json(
             artifact_directory / "provider-config.json",
-            request.session_options.model_dump(
+            request.provider_settings.model_dump(
                 mode="json",
                 by_alias=True,
                 exclude_none=True,
@@ -139,12 +130,8 @@ class RealtimeEvaluationService:
             artifact_directory / "transcript.json",
             {
                 "events": [
-                    event.model_dump(
-                        mode="json",
-                        exclude={"audio"},
-                        exclude_none=False,
-                    )
-                    for event in events
+                    event.model_dump(mode="json", exclude_none=False)
+                    for event in conversation_events
                 ]
             },
         )
@@ -170,20 +157,18 @@ class RealtimeEvaluationService:
             output.writeframes(audio)
 
     @staticmethod
-    def _evaluation_template(request: RealtimeEvaluationRequest) -> str:
-        return f"""# Realtime voice evaluation
+    def _evaluation_template(request: SplitPipelineEvaluationRequest) -> str:
+        return f"""# Voice evaluation
 
 - Run: `{request.run_id}`
 - Variant: `{request.variant_id}`
 - Combination: `{request.combination_key}`
-- Path: `realtime`
 
 ## Manual scores (1–5)
 
 - Voice quality:
 - Persona consistency:
 - Scenario goal:
-- Interruption handling:
 - Safety: pass / violation
 
 ## Comments

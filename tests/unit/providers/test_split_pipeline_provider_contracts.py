@@ -3,9 +3,9 @@ from collections.abc import AsyncIterator
 import pytest
 
 from oncue_voice.conversation.models import AssistantChunk, DialoguePolicy, UserTurn
-from oncue_voice.providers.fake_llm_provider import FakeLlmProvider
-from oncue_voice.providers.fake_stt_provider import FakeSttProvider
-from oncue_voice.providers.fake_tts_provider import FakeTtsProvider
+from oncue_voice.providers.split_pipeline.fake_llm_provider import FakeLlmProvider
+from oncue_voice.providers.split_pipeline.fake_stt_provider import FakeSttProvider
+from oncue_voice.providers.split_pipeline.fake_tts_provider import FakeTtsProvider
 
 
 async def audio_chunks() -> AsyncIterator[bytes]:
@@ -34,7 +34,7 @@ def create_policy() -> DialoguePolicy:
 
 
 @pytest.mark.asyncio
-async def test_fake_stt_streams_configured_transcript_segments() -> None:
+async def test_fake_split_pipeline_stt_streams_configured_transcript_segments() -> None:
     provider = FakeSttProvider(
         segments=(
             {"text": "hello", "isFinal": True, "startMs": 0, "endMs": 500},
@@ -48,7 +48,7 @@ async def test_fake_stt_streams_configured_transcript_segments() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fake_llm_streams_configured_chunks_after_reading_turns() -> None:
+async def test_fake_split_pipeline_llm_streams_configured_chunks_after_reading_turns() -> None:
     provider = FakeLlmProvider(
         chunks=(AssistantChunk(text="잘 자요", sequence=0),)
     )
@@ -67,7 +67,7 @@ async def test_fake_llm_streams_configured_chunks_after_reading_turns() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fake_tts_streams_configured_audio_for_text() -> None:
+async def test_fake_split_pipeline_tts_streams_configured_audio_for_text() -> None:
     provider = FakeTtsProvider(audio_by_text={"안녕": (b"audio-1", b"audio-2")})
 
     result = [chunk async for chunk in provider.stream_synthesize("안녕")]
