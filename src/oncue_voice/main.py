@@ -1,6 +1,8 @@
 import os
 from collections.abc import Callable
+from typing import Any
 
+import redis
 import uvicorn
 from fastapi import FastAPI
 
@@ -24,6 +26,8 @@ from oncue_voice.session.store import (
     InMemoryJtiStore,
     InMemoryVoiceSessionStore,
     JtiStore,
+    RedisJtiStore,
+    RedisVoiceSessionStore,
     VoiceSessionStore,
 )
 
@@ -38,9 +42,20 @@ def create_app(
     signaling_session_factory: SignalingSessionFactory | None = None,
     runtime_runner_factory: RuntimeRunnerFactory | None = None,
     result_callback: CallResultCallback | None = None,
+    redis_client: Any | None = None,
 ) -> FastAPI:
-    resolved_voice_session_store = voice_session_store or InMemoryVoiceSessionStore()
+    resolved_redis_client = _resolve_redis_client(
+        redis_client,
+        needs_store=voice_session_store is None or jti_store is None,
+    )
+    resolved_voice_session_store = voice_session_store or _create_voice_session_store(
+        resolved_redis_client
+    )
+    resolved_jti_store = jti_store or _create_jti_store(resolved_redis_client)
     app = FastAPI(title="OnCue Voice")
+    app.state.redis_client = resolved_redis_client
+    app.state.voice_session_store = resolved_voice_session_store
+    app.state.jti_store = resolved_jti_store
     app.include_router(
         create_internal_router(
             session_service or SessionService(resolved_voice_session_store),
@@ -53,7 +68,9 @@ def create_app(
         signaling_session_factory=signaling_session_factory,
         runtime_runner_factory=runtime_runner_factory,
     ):
-        resolved_token_verifier = token_verifier or _create_token_verifier(jti_store)
+        resolved_token_verifier = token_verifier or _create_token_verifier(
+            resolved_jti_store
+        )
         resolved_session_factory = signaling_session_factory
         if resolved_session_factory is None:
             resolved_runtime_runner_factory = (
@@ -106,6 +123,35 @@ def _create_token_verifier(jti_store: JtiStore | None) -> ConnectionTokenVerifie
         public_key_settings.public_key,
         jti_store or InMemoryJtiStore(),
     )
+
+
+def _resolve_redis_client(
+    redis_client: Any | None,
+    *,
+    needs_store: bool,
+) -> Any | None:
+    if redis_client is not None:
+        return redis_client
+    redis_host = os.getenv("REDIS_HOST", "").strip()
+    if not redis_host or not needs_store:
+        return None
+    try:
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    except ValueError as error:
+        raise ValueError("REDIS_PORT must be an integer") from error
+    return redis.Redis(host=redis_host, port=redis_port, decode_responses=False)
+
+
+def _create_voice_session_store(redis_client: Any | None) -> VoiceSessionStore:
+    if redis_client is None:
+        return InMemoryVoiceSessionStore()
+    return RedisVoiceSessionStore(redis_client)
+
+
+def _create_jti_store(redis_client: Any | None) -> JtiStore:
+    if redis_client is None:
+        return InMemoryJtiStore()
+    return RedisJtiStore(redis_client)
 
 
 def _create_runtime_runner_factory() -> RuntimeRunnerFactory:
