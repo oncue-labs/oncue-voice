@@ -32,12 +32,12 @@ def create_key_pair() -> tuple[str, str]:
     return private_pem, public_pem
 
 
-def create_token(private_key: str, *, call_session_id: str = "call-1") -> str:
+def create_token(private_key: str, *, call_session_id: int = 1) -> str:
     now = int(datetime.now(timezone.utc).timestamp())
     return jwt.encode(
         {
             "callSessionId": call_session_id,
-            "userId": "user-1",
+            "userId": 7,
             "scope": "voice:connect",
             "jti": f"token-{call_session_id}",
             "iat": now,
@@ -74,7 +74,7 @@ class FakeSignalingSessionFactory:
         self.session = FakeSignalingSession()
         self.known = known
 
-    def create(self, call_session_id: str, claims) -> FakeSignalingSession:
+    def create(self, call_session_id: int, claims) -> FakeSignalingSession:
         assert call_session_id == claims.call_session_id
         if not self.known:
             raise UnknownCallSessionError(call_session_id)
@@ -96,7 +96,7 @@ def test_signaling_accepts_offer_and_returns_symmetric_answer() -> None:
     client, factory, token = create_client()
 
     with client.websocket_connect(
-        "/v1/signaling/call-sessions/call-1",
+        "/v1/signaling/call-sessions/1",
         headers={"Authorization": f"Bearer {token}"},
     ) as websocket:
         websocket.send_json({"type": "offer", "payload": {"sdp": "offer-sdp"}})
@@ -112,7 +112,7 @@ def test_signaling_forwards_ice_candidate_and_closes_on_hangup() -> None:
     client, factory, token = create_client()
 
     with client.websocket_connect(
-        "/v1/signaling/call-sessions/call-1",
+        "/v1/signaling/call-sessions/1",
         headers={"Authorization": f"Bearer {token}"},
     ) as websocket:
         websocket.send_json(
@@ -136,7 +136,7 @@ def test_signaling_rejects_missing_connection_token() -> None:
     client, _, _ = create_client()
 
     with pytest.raises(WebSocketDisconnect) as error:
-        with client.websocket_connect("/v1/signaling/call-sessions/call-1"):
+        with client.websocket_connect("/v1/signaling/call-sessions/1"):
             pass
 
     assert error.value.code == 1008
@@ -147,7 +147,7 @@ def test_signaling_rejects_unknown_call_session() -> None:
 
     with pytest.raises(WebSocketDisconnect) as error:
         with client.websocket_connect(
-            "/v1/signaling/call-sessions/call-1",
+            "/v1/signaling/call-sessions/1",
             headers={"Authorization": f"Bearer {token}"},
         ):
             pass
@@ -159,7 +159,7 @@ def test_signaling_rejects_invalid_sdp() -> None:
     client, _, token = create_client()
 
     with client.websocket_connect(
-        "/v1/signaling/call-sessions/call-1",
+        "/v1/signaling/call-sessions/1",
         headers={"Authorization": f"Bearer {token}"},
     ) as websocket:
         websocket.send_json({"type": "offer", "payload": {"sdp": ""}})
@@ -174,7 +174,7 @@ def test_signaling_closes_session_after_abnormal_disconnect() -> None:
     client, factory, token = create_client()
 
     with client.websocket_connect(
-        "/v1/signaling/call-sessions/call-1",
+        "/v1/signaling/call-sessions/1",
         headers={"Authorization": f"Bearer {token}"},
     ) as websocket:
         websocket.close(code=1001)

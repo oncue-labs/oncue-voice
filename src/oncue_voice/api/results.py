@@ -37,7 +37,7 @@ class VoiceCallResultCallbackClient:
         self._http_client = http_client or httpx.Client(base_url=base_url)
         self._service_token = service_token
 
-    def send_result(self, call_session_id: str, result: CallResult) -> None:
+    def send_result(self, call_session_id: int, result: CallResult) -> None:
         response = self._http_client.post(
             f"/internal/v1/call-sessions/{call_session_id}/result",
             json=result.model_dump(by_alias=True, mode="json"),

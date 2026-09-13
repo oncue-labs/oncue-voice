@@ -53,7 +53,7 @@ class RedisJtiStore:
 
 
 class VoiceSessionStore(Protocol):
-    def get_by_call_session_id(self, call_session_id: str) -> VoiceSession | None:
+    def get_by_call_session_id(self, call_session_id: int) -> VoiceSession | None:
         """Find a voice session by the public OnCue call session ID."""
 
     def get_by_voice_session_id(self, voice_session_id: str) -> VoiceSession | None:
@@ -66,9 +66,9 @@ class VoiceSessionStore(Protocol):
 class InMemoryVoiceSessionStore:
     def __init__(self) -> None:
         self._sessions_by_voice_id: dict[str, VoiceSession] = {}
-        self._voice_id_by_call_id: dict[str, str] = {}
+        self._voice_id_by_call_id: dict[int, str] = {}
 
-    def get_by_call_session_id(self, call_session_id: str) -> VoiceSession | None:
+    def get_by_call_session_id(self, call_session_id: int) -> VoiceSession | None:
         voice_session_id = self._voice_id_by_call_id.get(call_session_id)
         if voice_session_id is None:
             return None
@@ -91,7 +91,7 @@ class RedisVoiceSessionStore:
         self._client = client
         self._key_prefix = key_prefix
 
-    def get_by_call_session_id(self, call_session_id: str) -> VoiceSession | None:
+    def get_by_call_session_id(self, call_session_id: int) -> VoiceSession | None:
         voice_session_id = self._decode(self._client.get(self._call_key(call_session_id)))
         if voice_session_id is None:
             return None
@@ -120,7 +120,7 @@ class RedisVoiceSessionStore:
     def _voice_key(self, voice_session_id: str) -> str:
         return f"{self._key_prefix}:voice:{voice_session_id}"
 
-    def _call_key(self, call_session_id: str) -> str:
+    def _call_key(self, call_session_id: int) -> str:
         return f"{self._key_prefix}:call:{call_session_id}"
 
     @staticmethod

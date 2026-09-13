@@ -41,21 +41,21 @@ class ConnectionTokenVerifier:
     def verify(
         self,
         token: str,
-        call_session_id: str,
-        user_id: str | None = None,
+        call_session_id: int,
+        user_id: int | None = None,
     ) -> ConnectionClaims:
         payload = self._decode(token)
         now = self._options.clock()
-        call_session_claim = self._identifier(payload.get("callSessionId"))
-        user_claim = self._identifier(payload.get("userId"))
+        call_session_claim = self._integer_identifier(payload.get("callSessionId"))
+        user_claim = self._integer_identifier(payload.get("userId"))
         jti = self._non_empty_string(payload.get("jti"))
         scope = self._scope(payload.get("scope"))
         issued_at = self._integer(payload.get("iat"))
         expires_at = self._integer(payload.get("exp"))
 
-        if call_session_claim != str(call_session_id):
+        if call_session_claim != call_session_id:
             raise self._invalid()
-        if user_id is not None and user_claim != str(user_id):
+        if user_id is not None and user_claim != user_id:
             raise self._invalid()
         if self._options.required_scope not in scope:
             raise self._invalid()
@@ -105,13 +105,10 @@ class ConnectionTokenVerifier:
         return payload
 
     @staticmethod
-    def _identifier(value: object) -> str:
-        if isinstance(value, bool) or not isinstance(value, (str, int)):
+    def _integer_identifier(value: object) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
             raise InvalidConnectionTokenError("invalid connection token")
-        identifier = str(value)
-        if not identifier:
-            raise InvalidConnectionTokenError("invalid connection token")
-        return identifier
+        return value
 
     @staticmethod
     def _non_empty_string(value: object) -> str:

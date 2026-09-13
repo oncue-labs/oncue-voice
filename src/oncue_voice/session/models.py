@@ -16,8 +16,10 @@ class SessionStatus(str, Enum):
 class ConnectionClaims(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    call_session_id: str = Field(alias="callSessionId")
-    user_id: str = Field(alias="userId")
+    # 백엔드의 자동 증가 통화 세션을 식별하는 값이다.
+    call_session_id: int = Field(alias="callSessionId", strict=True)
+    # 통화를 예약한 백엔드 사용자를 식별하는 값이다.
+    user_id: int = Field(alias="userId", strict=True)
     scope: tuple[str, ...]
     # 토큰을 한 번만 사용할 수 있게 추적하는 고유 식별자다.
     jti: str
@@ -30,8 +32,10 @@ class ConnectionClaims(BaseModel):
 class CreateSessionRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    call_session_id: str = Field(alias="callSessionId")
-    user_id: str = Field(alias="userId")
+    # 준비할 백엔드 통화 세션을 식별하는 값이다.
+    call_session_id: int = Field(alias="callSessionId", strict=True)
+    # 준비한 통화를 사용할 백엔드 사용자를 식별하는 값이다.
+    user_id: int = Field(alias="userId", strict=True)
     policy_snapshot: DialoguePolicy = Field(alias="policySnapshot")
     expires_at: datetime = Field(alias="expiresAt")
 
@@ -40,8 +44,10 @@ class VoiceSession(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     voice_session_id: str = Field(alias="voiceSessionId")
-    call_session_id: str = Field(alias="callSessionId")
-    user_id: str = Field(alias="userId")
+    # 이 보이스 세션에 연결된 백엔드 통화 세션을 식별하는 값이다.
+    call_session_id: int = Field(alias="callSessionId", strict=True)
+    # 이 보이스 세션으로 연결할 백엔드 사용자를 식별하는 값이다.
+    user_id: int = Field(alias="userId", strict=True)
     policy_snapshot: DialoguePolicy = Field(alias="policySnapshot")
     expires_at: datetime = Field(alias="expiresAt")
     status: SessionStatus

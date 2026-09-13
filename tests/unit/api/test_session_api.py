@@ -26,8 +26,8 @@ def policy_payload() -> dict[str, object]:
 
 def session_payload(
     *,
-    call_session_id: str = "call-1",
-    user_id: str = "user-1",
+    call_session_id: int = 1,
+    user_id: int = 7,
 ) -> dict[str, object]:
     return {
         "callSessionId": call_session_id,
@@ -79,10 +79,10 @@ async def test_create_voice_session_returns_internal_id_and_created_at() -> None
 
     assert response.status_code == 200
     body = response.json()
-    assert body["callSessionId"] == "call-1"
+    assert body["callSessionId"] == 1
     assert body["voiceSessionId"]
     assert body["createdAt"]
-    assert service.get(body["voiceSessionId"]).call_session_id == "call-1"
+    assert service.get(body["voiceSessionId"]).call_session_id == 1
 
 
 @pytest.mark.anyio
@@ -131,7 +131,7 @@ async def test_create_voice_session_rejects_conflicting_duplicate() -> None:
         )
         response = await client.post(
             "/internal/v1/voice-sessions",
-            json=session_payload(user_id="user-2"),
+            json=session_payload(user_id=8),
             headers=auth_headers(),
         )
 
@@ -226,11 +226,11 @@ def test_result_callback_sends_service_authenticated_contract_payload() -> None:
         endedAt=datetime(2026, 9, 12, 12, 5, tzinfo=timezone.utc),
     )
 
-    callback.send_result("call-1", result)
+    callback.send_result(1, result)
 
     assert client.calls == [
         {
-            "url": "/internal/v1/call-sessions/call-1/result",
+            "url": "/internal/v1/call-sessions/1/result",
             "json": result.model_dump(by_alias=True, mode="json"),
             "headers": {"Authorization": f"Bearer {SERVICE_TOKEN}"},
         }

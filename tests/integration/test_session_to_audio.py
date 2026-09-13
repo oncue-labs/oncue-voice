@@ -143,8 +143,8 @@ def _connection_token(private_key: str) -> str:
     now = int(datetime.now(timezone.utc).timestamp())
     return jwt.encode(
         {
-            "callSessionId": "call-1",
-            "userId": "user-1",
+            "callSessionId": 1,
+            "userId": 7,
             "scope": "voice:connect",
             "jti": "jti-call-1",
             "iat": now,
@@ -213,8 +213,8 @@ def test_session_creation_to_audio_runtime_and_final_callback(
             "/internal/v1/voice-sessions",
             headers={"Authorization": "Bearer service-token"},
             json={
-                "callSessionId": "call-1",
-                "userId": "user-1",
+                "callSessionId": 1,
+                "userId": 7,
                 "policySnapshot": _policy_payload(),
                 "expiresAt": (
                     datetime.now(timezone.utc) + timedelta(minutes=5)
@@ -223,12 +223,12 @@ def test_session_creation_to_audio_runtime_and_final_callback(
         )
         assert response.status_code == 200
         created = response.json()
-        assert created["callSessionId"] == "call-1"
+        assert created["callSessionId"] == 1
         assert created["voiceSessionId"]
         assert created["createdAt"]
 
         with client.websocket_connect(
-            "/v1/signaling/call-sessions/call-1",
+            "/v1/signaling/call-sessions/1",
             headers={"Authorization": f"Bearer {_connection_token(private_key)}"},
         ) as websocket:
             websocket.send_json(
@@ -250,12 +250,12 @@ def test_session_creation_to_audio_runtime_and_final_callback(
     assert peer.closed is True
     assert len(callback.calls) == 1
     call_session_id, result = callback.calls[0]
-    assert call_session_id == "call-1"
+    assert call_session_id == 1
     assert result.voice_session_id == created["voiceSessionId"]
     assert result.call_status.value == "IN_CALL"
     assert result.call_outcome.value == "SUCCEEDED"
 
-    persisted_session = store.get_by_call_session_id("call-1")
+    persisted_session = store.get_by_call_session_id(1)
     assert persisted_session is not None
     assert set(persisted_session.model_dump()) == {
         "voice_session_id",

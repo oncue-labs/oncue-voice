@@ -56,7 +56,7 @@ class SignalingSession(Protocol):
 class SignalingSessionFactory(Protocol):
     def create(
         self,
-        call_session_id: str,
+        call_session_id: int,
         claims: ConnectionClaims,
     ) -> SignalingSession:
         """Create the WebRTC session for an authenticated call."""
@@ -87,7 +87,7 @@ class DefaultSignalingSessionFactory:
 
     def create(
         self,
-        call_session_id: str,
+        call_session_id: int,
         claims: ConnectionClaims,
     ) -> SignalingSession:
         session = self._voice_session_store.get_by_call_session_id(call_session_id)
@@ -133,7 +133,7 @@ class DefaultSignalingSessionFactory:
     def _is_usable(
         self,
         session: VoiceSession | None,
-        call_session_id: str,
+        call_session_id: int,
         claims: ConnectionClaims,
     ) -> bool:
         if session is None:
@@ -222,7 +222,7 @@ def create_signaling_router(
     @router.websocket("/v1/signaling/call-sessions/{call_session_id}")
     async def signaling_socket(
         websocket: WebSocket,
-        call_session_id: str,
+        call_session_id: int,
     ) -> None:
         token = _connection_token(websocket)
         if token is None:

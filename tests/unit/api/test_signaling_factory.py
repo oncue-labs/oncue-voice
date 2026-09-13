@@ -31,10 +31,10 @@ def create_policy() -> DialoguePolicy:
     )
 
 
-def create_claims(*, user_id: str = "user-1") -> ConnectionClaims:
+def create_claims(*, user_id: int = 7) -> ConnectionClaims:
     now = int(datetime.now(timezone.utc).timestamp())
     return ConnectionClaims(
-        callSessionId="call-1",
+        callSessionId=1,
         userId=user_id,
         scope=(VOICE_CONNECT_SCOPE,),
         jti="token-1",
@@ -91,8 +91,8 @@ class FakeResultCallback:
 def create_prepared_session(store: InMemoryVoiceSessionStore) -> None:
     SessionService(store).create(
         CreateSessionRequest(
-            callSessionId="call-1",
-            userId="user-1",
+            callSessionId=1,
+            userId=7,
             policySnapshot=create_policy(),
             expiresAt=datetime.now(timezone.utc) + timedelta(minutes=5),
         )
@@ -123,7 +123,7 @@ async def test_factory_builds_media_session_from_stored_policy_and_runtime() -> 
         peer_connection_factory=lambda: peer,
     )
 
-    session = factory.create("call-1", create_claims())
+    session = factory.create(1, create_claims())
 
     assert isinstance(session, ManagedSignalingSession)
     assert runtime_sessions[0].policy_snapshot == create_policy()
@@ -143,7 +143,7 @@ async def test_factory_uses_coturn_environment_for_default_peer_connection(
     create_prepared_session(store)
     factory = DefaultSignalingSessionFactory(store, lambda session: _empty_runtime())
 
-    session = factory.create("call-1", create_claims())
+    session = factory.create(1, create_claims())
     peer = session._media._peer_connection
     configuration = peer.__dict__["_RTCPeerConnection__configuration"]
     ice_server = configuration.iceServers[0]
@@ -169,14 +169,14 @@ async def test_factory_session_reports_user_hangup_result() -> None:
         result_callback=callback,
     )
 
-    session = factory.create("call-1", create_claims())
+    session = factory.create(1, create_claims())
     await session.accept_offer(SdpOffer(sdp="offer"))
     result = await session.finish(CallTerminationReason.USER_HANGUP)
 
     assert result is not None
     assert result.call_status is CallStatus.IN_CALL
     assert result.call_outcome is CallOutcome.SUCCEEDED
-    assert callback.calls[0][0] == "call-1"
+    assert callback.calls[0][0] == 1
     await session.close()
 
 
@@ -196,7 +196,7 @@ async def test_factory_reports_provider_error_and_closes_media() -> None:
         peer_connection_factory=lambda: peer,
         result_callback=callback,
     )
-    session = factory.create("call-1", create_claims())
+    session = factory.create(1, create_claims())
 
     await session.accept_offer(SdpOffer(sdp="offer"))
     await asyncio.sleep(0.01)
@@ -219,7 +219,7 @@ async def test_factory_reports_time_limit_and_closes_media() -> None:
         result_callback=callback,
         max_duration_seconds=0.0,
     )
-    session = factory.create("call-1", create_claims())
+    session = factory.create(1, create_claims())
 
     await session.accept_offer(SdpOffer(sdp="offer"))
     await asyncio.sleep(0.01)
@@ -238,9 +238,9 @@ def test_factory_rejects_unknown_or_wrong_user_session() -> None:
     )
 
     with pytest.raises(UnknownCallSessionError):
-        factory.create("unknown", create_claims())
+        factory.create(999, create_claims())
     with pytest.raises(UnknownCallSessionError):
-        factory.create("call-1", create_claims(user_id="user-2"))
+        factory.create(1, create_claims(user_id=8))
 
 
 def _empty_runtime():

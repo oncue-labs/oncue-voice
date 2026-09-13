@@ -26,8 +26,8 @@ def create_policy() -> DialoguePolicy:
 
 
 def create_request(
-    call_session_id: str = "call-1",
-    user_id: str = "user-1",
+    call_session_id: int = 1,
+    user_id: int = 7,
     expires_at: str | None = None,
 ) -> CreateSessionRequest:
     expiry = expires_at or (
@@ -48,12 +48,12 @@ def test_create_generates_voice_session_and_stores_policy_snapshot() -> None:
     session = service.create(create_request())
 
     assert session.voice_session_id
-    assert session.call_session_id == "call-1"
-    assert session.user_id == "user-1"
+    assert session.call_session_id == 1
+    assert session.user_id == 7
     assert session.status is SessionStatus.PREPARED
     assert session.policy_snapshot.goal == "help the child get ready for bed"
     assert store.get_by_voice_session_id(session.voice_session_id) == session
-    assert store.get_by_call_session_id("call-1") == session
+    assert store.get_by_call_session_id(1) == session
 
 
 def test_create_is_idempotent_for_same_call_session() -> None:
@@ -71,7 +71,7 @@ def test_create_rejects_conflicting_duplicate_call_session() -> None:
     service.create(create_request())
 
     with pytest.raises(SessionConflictError, match="call session already exists"):
-        service.create(create_request(user_id="user-2"))
+        service.create(create_request(user_id=8))
 
 
 def test_create_rejects_expired_session() -> None:

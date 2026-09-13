@@ -33,8 +33,8 @@ def create_key_pair() -> tuple[str, str]:
 def create_token(private_key: str, **overrides: object) -> str:
     now = int(datetime.now(timezone.utc).timestamp())
     claims: dict[str, object] = {
-        "callSessionId": "call-1",
-        "userId": "user-1",
+        "callSessionId": 1,
+        "userId": 7,
         "scope": "voice:connect",
         "jti": "token-1",
         "iat": now,
@@ -53,10 +53,10 @@ def test_verifier_accepts_signed_token_and_consumes_jti_once() -> None:
     token = create_token(private_key)
     verifier = create_verifier(public_key)
 
-    claims = verifier.verify(token, "call-1", "user-1")
+    claims = verifier.verify(token, 1, 7)
 
-    assert claims.call_session_id == "call-1"
-    assert claims.user_id == "user-1"
+    assert claims.call_session_id == 1
+    assert claims.user_id == 7
     assert claims.scope == ("voice:connect",)
     assert claims.jti == "token-1"
 
@@ -66,7 +66,7 @@ def test_verifier_rejects_expired_token() -> None:
     token = create_token(private_key, exp=1)
 
     with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
-        create_verifier(public_key).verify(token, "call-1", "user-1")
+        create_verifier(public_key).verify(token, 1, 7)
 
 
 def test_verifier_rejects_token_for_another_call_session() -> None:
@@ -74,7 +74,7 @@ def test_verifier_rejects_token_for_another_call_session() -> None:
     token = create_token(private_key)
 
     with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
-        create_verifier(public_key).verify(token, "call-2", "user-1")
+        create_verifier(public_key).verify(token, 2, 7)
 
 
 def test_verifier_rejects_token_for_another_user() -> None:
@@ -82,7 +82,7 @@ def test_verifier_rejects_token_for_another_user() -> None:
     token = create_token(private_key)
 
     with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
-        create_verifier(public_key).verify(token, "call-1", "user-2")
+        create_verifier(public_key).verify(token, 1, 8)
 
 
 def test_verifier_rejects_missing_required_scope() -> None:
@@ -90,7 +90,7 @@ def test_verifier_rejects_missing_required_scope() -> None:
     token = create_token(private_key, scope="reservation:read")
 
     with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
-        create_verifier(public_key).verify(token, "call-1", "user-1")
+        create_verifier(public_key).verify(token, 1, 7)
 
 
 def test_verifier_rejects_replayed_jti() -> None:
@@ -98,10 +98,10 @@ def test_verifier_rejects_replayed_jti() -> None:
     token = create_token(private_key)
     verifier = create_verifier(public_key)
 
-    verifier.verify(token, "call-1", "user-1")
+    verifier.verify(token, 1, 7)
 
     with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
-        verifier.verify(token, "call-1", "user-1")
+        verifier.verify(token, 1, 7)
 
 
 def test_verifier_supports_injected_clock_for_expiration() -> None:
@@ -117,6 +117,14 @@ def test_verifier_supports_injected_clock_for_expiration() -> None:
         ConnectionTokenVerifierOptions(clock=lambda: 1_010.0),
     )
 
-    claims = verifier.verify(token, "call-1", "user-1")
+    claims = verifier.verify(token, 1, 7)
 
     assert claims.exp == 1_060
+
+
+def test_verifier_rejects_string_identifiers() -> None:
+    private_key, public_key = create_key_pair()
+    token = create_token(private_key, callSessionId="1", userId="7")
+
+    with pytest.raises(InvalidConnectionTokenError, match="invalid connection token"):
+        create_verifier(public_key).verify(token, 1, 7)

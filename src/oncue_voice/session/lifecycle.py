@@ -16,7 +16,7 @@ class CallTerminationReason(str, Enum):
 
 
 class CallResultCallback(Protocol):
-    def send_result(self, call_session_id: str, result: CallResult) -> None:
+    def send_result(self, call_session_id: int, result: CallResult) -> None:
         """Send one final result to the backend."""
 
 
@@ -26,7 +26,7 @@ class CallLifecycle:
     def __init__(
         self,
         *,
-        call_session_id: str,
+        call_session_id: int,
         voice_session_id: str,
         result_callback: CallResultCallback | None,
         clock: Callable[[], datetime] | None = None,

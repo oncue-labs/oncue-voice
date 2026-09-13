@@ -31,7 +31,7 @@ def create_clock():
 async def test_user_hangup_reports_successful_in_call_result_once() -> None:
     callback = FakeResultCallback()
     lifecycle = CallLifecycle(
-        call_session_id="call-1",
+        call_session_id=1,
         voice_session_id="voice-1",
         result_callback=callback,
         clock=create_clock(),
@@ -64,7 +64,7 @@ async def test_technical_termination_reports_failed_result(
 ) -> None:
     callback = FakeResultCallback()
     lifecycle = CallLifecycle(
-        call_session_id="call-1",
+        call_session_id=1,
         voice_session_id="voice-1",
         result_callback=callback,
         clock=create_clock(),
@@ -83,7 +83,7 @@ async def test_technical_termination_reports_failed_result(
 async def test_scenario_completion_reports_success_without_extra_contract_field() -> None:
     callback = FakeResultCallback()
     lifecycle = CallLifecycle(
-        call_session_id="call-1",
+        call_session_id=1,
         voice_session_id="voice-1",
         result_callback=callback,
         clock=create_clock(),
