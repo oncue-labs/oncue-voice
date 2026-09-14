@@ -251,6 +251,8 @@ def create_signaling_router(
             if finish is not None:
                 await finish(termination_reason)
             await session.close()
+            if termination_reason is CallTerminationReason.USER_HANGUP:
+                await websocket.close(code=1000)
 
     return router
 

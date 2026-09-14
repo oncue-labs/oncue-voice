@@ -127,6 +127,11 @@ def test_signaling_forwards_ice_candidate_and_closes_on_hangup() -> None:
         )
         websocket.send_json({"type": "hangup"})
 
+        with pytest.raises(WebSocketDisconnect) as error:
+            websocket.receive_json()
+
+        assert error.value.code == 1000
+
     assert factory.session.candidates[0].sdp_mid == "0"
     assert factory.session.closed is True
     assert factory.session.finished == [CallTerminationReason.USER_HANGUP]
