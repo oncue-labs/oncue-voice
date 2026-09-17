@@ -1,4 +1,6 @@
 import json
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +14,17 @@ from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
     RealtimeSessionOptions,
 )
+
+
+REPOSITORY_ROOT = Path(__file__).parents[2]
+
+
+def current_repository_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        text=True,
+    ).strip()
 
 
 def create_policy() -> DialoguePolicy:
@@ -64,6 +77,7 @@ async def test_realtime_evaluation_service_writes_audio_and_transcript_artifacts
     assert (result.artifact_directory / "response.wav").read_bytes().startswith(b"RIFF")
     run_data = json.loads((result.artifact_directory / "run.json").read_text())
     assert run_data["evaluationPath"] == "realtime"
+    assert run_data["oncueVoiceCommit"] == current_repository_commit()
     assert "variantId" not in run_data
     assert run_data["audioBytes"] == len(b"pcm-audio")
     transcript_data = json.loads(

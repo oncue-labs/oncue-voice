@@ -8,6 +8,7 @@ from pathlib import Path
 
 from oncue_voice.conversation.models import DialoguePolicy
 from oncue_voice.conversation.realtime_runtime import RealtimeRuntime
+from oncue_voice.evaluation.metadata import get_oncue_voice_commit
 from oncue_voice.evaluation.paths import EvaluationRunPaths, allocate_evaluation_run
 from oncue_voice.providers.realtime.models import (
     RealtimeEvent,
@@ -108,6 +109,7 @@ class RealtimeEvaluationService:
                 "combinationKey": request.combination_key,
                 "provider": request.provider,
                 "evaluationPath": "realtime",
+                "oncueVoiceCommit": get_oncue_voice_commit(),
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "succeeded": succeeded,
                 "elapsedMs": elapsed_ms,

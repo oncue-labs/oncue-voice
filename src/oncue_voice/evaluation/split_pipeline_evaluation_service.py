@@ -16,6 +16,7 @@ from oncue_voice.evaluation.paths import (
     EvaluationRunPaths,
     allocate_evaluation_run,
 )
+from oncue_voice.evaluation.metadata import get_oncue_voice_commit
 from oncue_voice.providers.split_pipeline.factory import ProviderFactory
 from oncue_voice.providers.split_pipeline.models import ProviderSettings
 
@@ -105,6 +106,7 @@ class SplitPipelineEvaluationService:
                 "runId": paths.run_id,
                 "combinationKey": request.combination_key,
                 "provider": request.provider_settings.provider,
+                "oncueVoiceCommit": get_oncue_voice_commit(),
                 "createdAt": datetime.now(timezone.utc).isoformat(),
                 "succeeded": True,
                 "elapsedMs": elapsed_ms,

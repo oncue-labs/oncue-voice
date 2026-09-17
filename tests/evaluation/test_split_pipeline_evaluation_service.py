@@ -1,4 +1,6 @@
 import json
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +18,17 @@ from oncue_voice.providers.split_pipeline.models import (
     ProviderCapabilities,
     ProviderSettings,
 )
+
+
+REPOSITORY_ROOT = Path(__file__).parents[2]
+
+
+def current_repository_commit() -> str:
+    return subprocess.check_output(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPOSITORY_ROOT,
+        text=True,
+    ).strip()
 
 
 def create_policy() -> DialoguePolicy:
@@ -94,6 +107,7 @@ async def test_split_pipeline_evaluation_service_writes_reproducible_local_artif
 
     run_data = json.loads((result.artifact_directory / "run.json").read_text())
     assert run_data["runId"] == "run-001"
+    assert run_data["oncueVoiceCommit"] == current_repository_commit()
     assert "variantId" not in run_data
     assert run_data["succeeded"] is True
 
