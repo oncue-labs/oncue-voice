@@ -4,6 +4,7 @@ import pytest
 from aiortc.mediastreams import MediaStreamError
 from av import AudioFrame
 
+import oncue_voice.media.audio as audio_module
 from oncue_voice.media.audio import (
     AudioRuntimeBridge,
     PcmAudioInput,
@@ -107,6 +108,56 @@ async def test_audio_runtime_bridge_forwards_split_and_realtime_audio() -> None:
     with pytest.raises(MediaStreamError):
         await audio_output.recv()
     assert completed == ["completed"]
+
+
+@pytest.mark.anyio
+async def test_audio_runtime_bridge_discards_output_when_user_starts_speaking() -> None:
+    audio_input = PcmAudioInput(sample_rate=24_000)
+    audio_output = PcmAudioOutputTrack(sample_rate=24_000)
+
+    async def runtime(audio):
+        del audio
+        yield RealtimeEvent(type="audio_delta", audio=b"\x08\x00" * 960)
+        yield RealtimeEvent(type="speech_started")
+        yield RealtimeEvent(type="audio_delta", audio=b"\x09\x00" * 480)
+
+    bridge = AudioRuntimeBridge(runtime, audio_input, audio_output)
+    await bridge.run()
+
+    frame = await audio_output.recv()
+
+    assert bytes(frame.planes[0])[:4] == b"\x09\x00" * 2
+    assert frame.samples == 480
+
+
+@pytest.mark.anyio
+async def test_audio_output_track_restarts_pacing_after_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = [0.0]
+    sleep_durations: list[float] = []
+
+    def monotonic() -> float:
+        return clock[0]
+
+    async def sleep(duration: float) -> None:
+        sleep_durations.append(duration)
+        clock[0] += duration
+
+    monkeypatch.setattr(audio_module.time, "monotonic", monotonic)
+    monkeypatch.setattr(audio_module.asyncio, "sleep", sleep)
+
+    audio_track = PcmAudioOutputTrack(sample_rate=24_000)
+    await audio_track.push_pcm(b"\x07\x00" * (480 * 100))
+    for _ in range(100):
+        await audio_track.recv()
+
+    await audio_track.interrupt()
+    await audio_track.push_pcm(b"\x09\x00" * 960)
+    await audio_track.recv()
+    await audio_track.recv()
+
+    assert sleep_durations[-1] < 0.05
 
 
 @pytest.mark.anyio

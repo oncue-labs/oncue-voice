@@ -107,7 +107,11 @@ class OpenAiRealtimeProvider:
                         options.input_audio_format,
                         options.sample_rate_hz,
                     ),
-                    "turn_detection": {"type": options.turn_detection},
+                    "turn_detection": {
+                        "type": options.turn_detection,
+                        "create_response": True,
+                        "interrupt_response": True,
+                    },
                 },
                 "output": {
                     "format": OpenAiRealtimeProvider._audio_format(

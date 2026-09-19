@@ -120,6 +120,20 @@ class PcmAudioOutputTrack(MediaStreamTrack):
         await self._chunks.put(None)
         super().stop()
 
+    async def interrupt(self) -> None:
+        """Discard provider audio that has not reached the WebRTC sender."""
+        if self._closed:
+            return
+        while True:
+            try:
+                self._chunks.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        self._pending_pcm.clear()
+        self._started_at = time.monotonic() - (
+            self._next_pts / self._sample_rate
+        )
+
     async def recv(self) -> AudioFrame:
         pcm = await self._chunks.get()
         if pcm is None:
@@ -179,6 +193,12 @@ class AudioRuntimeBridge:
                 if isinstance(event, RealtimeEvent) and event.type == "error":
                     await self._notify(self._on_provider_error)
                     return
+                if (
+                    isinstance(event, RealtimeEvent)
+                    and event.type == "speech_started"
+                ):
+                    await self._audio_output.interrupt()
+                    continue
                 pcm = self._audio_bytes(event)
                 if pcm:
                     self._output_chunk_count += 1

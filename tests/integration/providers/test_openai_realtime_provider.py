@@ -103,6 +103,11 @@ async def test_openai_realtime_adapter_sends_policy_and_audio_event() -> None:
         "type": "audio/pcm",
         "rate": 24_000,
     }
+    assert session_config["audio"]["input"]["turn_detection"] == {
+        "type": "server_vad",
+        "create_response": True,
+        "interrupt_response": True,
+    }
     assert session_config["audio"]["output"]["format"] == {
         "type": "audio/pcm",
         "rate": 24_000,
