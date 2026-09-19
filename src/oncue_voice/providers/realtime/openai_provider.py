@@ -1,5 +1,6 @@
 import base64
 import binascii
+import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -26,7 +27,16 @@ from oncue_voice.providers.realtime.models import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class OpenAiRealtimeProvider:
+    _VOICE_ALIASES = {
+        "santa-default": "alloy",
+        "princess-default": "coral",
+        "friend-default": "ash",
+    }
+
     def __init__(self, client: Any) -> None:
         self._client = client
 
@@ -37,6 +47,10 @@ class OpenAiRealtimeProvider:
     ) -> "OpenAiRealtimeSession":
         session_config = self._session_config(policy, options)
         try:
+            logger.info(
+                "openai.realtime_connect_started model=%s",
+                options.model,
+            )
             connection_manager = self._realtime_api().connect(model=options.model)
             connection = await self._enter_connection(connection_manager)
             await connection.send(
@@ -44,6 +58,10 @@ class OpenAiRealtimeProvider:
                     "type": "session.update",
                     "session": session_config,
                 }
+            )
+            logger.info(
+                "openai.realtime_session_configured model=%s",
+                options.model,
             )
             return OpenAiRealtimeSession(connection)
         except AuthenticationError as error:
@@ -81,6 +99,7 @@ class OpenAiRealtimeProvider:
         return {
             "type": "realtime",
             "model": options.model,
+            "output_modalities": ["audio"],
             "instructions": render_dialogue_policy(policy),
             "audio": {
                 "input": {
@@ -95,10 +114,17 @@ class OpenAiRealtimeProvider:
                         options.output_audio_format,
                         options.sample_rate_hz,
                     ),
-                    "voice": options.voice_id,
+                    "voice": OpenAiRealtimeProvider._provider_voice_id(
+                        options.voice_id
+                    ),
                 },
             },
         }
+
+    @classmethod
+    def _provider_voice_id(cls, voice_id: str) -> str:
+        """Translate OnCue's stable persona voice ID to OpenAI's voice ID."""
+        return cls._VOICE_ALIASES.get(voice_id, voice_id)
 
     @staticmethod
     def _audio_format(format_name: str, sample_rate_hz: int) -> dict[str, Any]:
@@ -117,10 +143,18 @@ class OpenAiRealtimeSession:
     def __init__(self, connection: Any) -> None:
         self._connection = connection
         self._closed = False
+        self._input_chunk_count = 0
+        self._output_audio_chunk_count = 0
 
     async def send_audio_chunk(self, audio: bytes) -> None:
         if not audio:
             return
+        self._input_chunk_count += 1
+        if self._input_chunk_count == 1:
+            logger.info(
+                "openai.realtime_input_audio_started bytes=%s",
+                len(audio),
+            )
         encoded_audio = base64.b64encode(audio).decode("ascii")
         try:
             await self._connection.send(
@@ -146,8 +180,19 @@ class OpenAiRealtimeSession:
     async def _event_stream(self) -> AsyncIterator[RealtimeEvent]:
         try:
             async for event in self._connection:
+                event_type = self._value(event, "type")
+                logger.info("openai.realtime_event type=%s", event_type)
                 mapped_event = self._to_event(event)
                 if mapped_event is not None:
+                    if mapped_event.type == "audio_delta":
+                        self._output_audio_chunk_count += 1
+                        if self._output_audio_chunk_count == 1:
+                            logger.info("openai.realtime_output_audio_started")
+                    elif mapped_event.type == "error":
+                        logger.warning(
+                            "openai.realtime_error_received message=%s",
+                            mapped_event.message,
+                        )
                     yield mapped_event
         except AuthenticationError as error:
             raise ProviderAuthenticationError("OpenAI authentication failed") from error

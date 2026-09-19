@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 import jwt
@@ -106,6 +107,25 @@ def test_signaling_accepts_offer_and_returns_symmetric_answer() -> None:
             "payload": {"sdp": "answer-sdp"},
         }
         assert factory.session.offers[0].sdp == "offer-sdp"
+
+
+def test_signaling_logs_safe_protocol_stages_without_payloads(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="oncue_voice.api.signaling")
+    client, _, token = create_client()
+
+    with client.websocket_connect(
+        "/v1/signaling/call-sessions/1",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as websocket:
+        websocket.send_json({"type": "offer", "payload": {"sdp": "offer-sdp"}})
+        assert websocket.receive_json()["type"] == "answer"
+        websocket.send_json({"type": "hangup"})
+
+    assert "signaling.websocket_accepted callSessionId=1" in caplog.text
+    assert "signaling.offer_received callSessionId=1" in caplog.text
+    assert "signaling.answer_sent callSessionId=1" in caplog.text
+    assert "signaling.hangup_received callSessionId=1" in caplog.text
+    assert "offer-sdp" not in caplog.text
 
 
 def test_signaling_forwards_ice_candidate_and_closes_on_hangup() -> None:

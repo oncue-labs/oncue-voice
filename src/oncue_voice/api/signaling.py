@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Protocol
@@ -33,6 +34,9 @@ from oncue_voice.session.lifecycle import (
     CallTerminationReason,
 )
 from oncue_voice.session.store import VoiceSessionStore
+
+
+logger = logging.getLogger(__name__)
 
 
 class UnknownCallSessionError(LookupError):
@@ -94,7 +98,10 @@ class DefaultSignalingSessionFactory:
         if not self._is_usable(session, call_session_id, claims):
             raise UnknownCallSessionError(call_session_id)
 
-        audio_input = PcmAudioInput(sample_rate=self._sample_rate)
+        audio_input = PcmAudioInput(
+            sample_rate=self._sample_rate,
+            call_session_id=session.call_session_id,
+        )
         audio_output = PcmAudioOutputTrack(sample_rate=self._sample_rate)
         lifecycle = CallLifecycle(
             call_session_id=session.call_session_id,
@@ -126,6 +133,7 @@ class DefaultSignalingSessionFactory:
                 audio_input=audio_input,
                 audio_output=audio_output,
                 runtime_bridge=bridge,
+                call_session_id=session.call_session_id,
             )
         )
         return managed_session
@@ -238,15 +246,32 @@ def create_signaling_router(
         try:
             session = session_factory.create(call_session_id, claims)
         except UnknownCallSessionError:
+            logger.info(
+                "signaling.websocket_rejected callSessionId=%s reason=unknown_session",
+                call_session_id,
+            )
             await websocket.close(code=1008)
             return
         await websocket.accept()
+        logger.info(
+            "signaling.websocket_accepted callSessionId=%s", call_session_id
+        )
         termination_reason = CallTerminationReason.ABNORMAL_DISCONNECT
         try:
             termination_reason = await _serve_messages(websocket, session)
-        except WebSocketDisconnect:
+        except WebSocketDisconnect as error:
+            logger.info(
+                "signaling.websocket_disconnected callSessionId=%s code=%s",
+                call_session_id,
+                error.code,
+            )
             return
         finally:
+            logger.info(
+                "signaling.finished callSessionId=%s reason=%s",
+                call_session_id,
+                termination_reason.value,
+            )
             finish = getattr(session, "finish", None)
             if finish is not None:
                 await finish(termination_reason)
@@ -270,22 +295,38 @@ async def _serve_messages(
 
         try:
             if message_type == "offer":
+                logger.info(
+                    "signaling.offer_received callSessionId=%s",
+                    websocket.path_params.get("call_session_id"),
+                )
                 offer = SdpOffer.model_validate(message.get("payload"))
                 answer = await session.accept_offer(offer)
                 await websocket.send_json(
                     {"type": "answer", "payload": answer.model_dump(mode="json")}
+                )
+                logger.info(
+                    "signaling.answer_sent callSessionId=%s",
+                    websocket.path_params.get("call_session_id"),
                 )
                 continue
 
             if message_type == "ice-candidate":
                 candidate = IceCandidate.model_validate(message.get("payload"))
                 await session.add_ice_candidate(candidate)
+                logger.info(
+                    "signaling.ice_candidate_received callSessionId=%s",
+                    websocket.path_params.get("call_session_id"),
+                )
                 continue
         except (ValidationError, ValueError):
             await websocket.close(code=1003)
             return CallTerminationReason.ABNORMAL_DISCONNECT
 
         if message_type == "hangup":
+            logger.info(
+                "signaling.hangup_received callSessionId=%s",
+                websocket.path_params.get("call_session_id"),
+            )
             return CallTerminationReason.USER_HANGUP
 
         await websocket.close(code=1003)

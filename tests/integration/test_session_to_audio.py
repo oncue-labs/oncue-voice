@@ -110,7 +110,7 @@ class FakeSplitPipelineRuntime:
 
     async def run(self, audio):
         self._received_chunks.append(await anext(audio))
-        yield b"\x10\x00\x11\x00"
+        yield b"\x10\x00\x11\x00" * 240
 
 
 class FakeRealtimeRuntime:
@@ -121,7 +121,7 @@ class FakeRealtimeRuntime:
         self._received_chunks.append(await anext(audio))
         yield RealtimeEvent(
             type="audio_delta",
-            audio=b"\x10\x00\x11\x00",
+            audio=b"\x10\x00\x11\x00" * 240,
         )
 
 
@@ -245,8 +245,8 @@ def test_session_creation_to_audio_runtime_and_final_callback(
 
     assert received_chunks
     assert received_chunks[0] == b"\x01\x00\x02\x00\x03\x00\x04\x00"
-    assert output.samples == 2
-    assert bytes(output.planes[0])[: output.samples * 2] == b"\x10\x00\x11\x00"
+    assert output.samples == 480
+    assert bytes(output.planes[0])[:4] == b"\x10\x00\x11\x00"
     assert peer.closed is True
     assert len(callback.calls) == 1
     call_session_id, result = callback.calls[0]

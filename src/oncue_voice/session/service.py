@@ -38,7 +38,7 @@ class SessionService:
             raise InvalidSessionError("expires_at must be in the future")
 
         existing = self._store.get_by_call_session_id(request.call_session_id)
-        if existing is not None:
+        if existing is not None and existing.status is not SessionStatus.CLOSED:
             if self._matches(existing, request):
                 return existing
             raise SessionConflictError("call session already exists")

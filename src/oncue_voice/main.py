@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import Callable
 from typing import Any
@@ -44,6 +45,7 @@ def create_app(
     result_callback: CallResultCallback | None = None,
     redis_client: Any | None = None,
 ) -> FastAPI:
+    logging.basicConfig(level=logging.INFO)
     resolved_redis_client = _resolve_redis_client(
         redis_client,
         needs_store=voice_session_store is None or jti_store is None,

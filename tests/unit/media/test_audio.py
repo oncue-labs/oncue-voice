@@ -54,6 +54,19 @@ async def test_audio_output_track_exposes_provider_pcm_as_audio_frame() -> None:
 
 
 @pytest.mark.anyio
+async def test_audio_output_track_splits_provider_audio_into_20ms_frames() -> None:
+    audio_track = PcmAudioOutputTrack(sample_rate=24_000)
+    await audio_track.push_pcm(b"\x07\x00" * 960)
+    await audio_track.close()
+
+    first_frame = await audio_track.recv()
+    second_frame = await audio_track.recv()
+
+    assert first_frame.samples == 480
+    assert second_frame.samples == 480
+
+
+@pytest.mark.anyio
 async def test_audio_output_track_raises_stream_error_after_close() -> None:
     audio_track = PcmAudioOutputTrack(sample_rate=24_000)
     await audio_track.close()
@@ -71,8 +84,8 @@ async def test_audio_runtime_bridge_forwards_split_and_realtime_audio() -> None:
     async def runtime(audio):
         received = [chunk async for chunk in audio]
         assert received == [b"\x07\x00" * 2]
-        yield b"\x08\x00" * 2
-        yield RealtimeEvent(type="audio_delta", audio=b"\x09\x00" * 2)
+        yield b"\x08\x00" * 480
+        yield RealtimeEvent(type="audio_delta", audio=b"\x09\x00" * 480)
 
     bridge = AudioRuntimeBridge(
         runtime,

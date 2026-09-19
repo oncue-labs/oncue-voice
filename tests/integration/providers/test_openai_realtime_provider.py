@@ -86,7 +86,7 @@ async def test_openai_realtime_adapter_sends_policy_and_audio_event() -> None:
     provider = OpenAiRealtimeProvider(client)
     options = RealtimeSessionOptions(
         model="gpt-realtime",
-        voice_id="alloy",
+        voice_id="santa-default",
         sample_rate_hz=24_000,
     )
 
@@ -98,6 +98,7 @@ async def test_openai_realtime_adapter_sends_policy_and_audio_event() -> None:
     assert connection.sent[0]["type"] == "session.update"
     session_config = connection.sent[0]["session"]
     assert session_config["instructions"]
+    assert session_config["output_modalities"] == ["audio"]
     assert session_config["audio"]["input"]["format"] == {
         "type": "audio/pcm",
         "rate": 24_000,

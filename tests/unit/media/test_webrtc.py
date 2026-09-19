@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -23,6 +24,7 @@ class FakePeerConnection:
         self.close_count = 0
         self.added_tracks = []
         self.track_handler = None
+        self.handlers = {}
 
     async def setRemoteDescription(self, description) -> None:
         self.remote_description = description
@@ -47,8 +49,9 @@ class FakePeerConnection:
         self.added_tracks.append(track)
 
     def on(self, event, handler):
-        assert event == "track"
-        self.track_handler = handler
+        self.handlers[event] = handler
+        if event == "track":
+            self.track_handler = handler
         return handler
 
 
@@ -63,6 +66,27 @@ async def test_accept_offer_returns_answer_with_contract_sdp_field() -> None:
     assert peer.remote_description.sdp == "offer-sdp"
     assert peer.remote_description.type == "offer"
     assert peer.local_description.sdp == "answer-sdp"
+
+
+@pytest.mark.anyio
+async def test_webrtc_session_logs_safe_offer_and_candidate_stages(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="oncue_voice.media.webrtc")
+    peer = FakePeerConnection()
+    session = WebRtcSession(peer)
+
+    await session.accept_offer(SdpOffer(sdp="offer-sdp"))
+    await session.add_ice_candidate(
+        IceCandidate(
+            candidate="candidate:1 1 UDP 1 127.0.0.1 40000 typ host",
+            sdp_mid="0",
+            sdp_m_line_index=0,
+        )
+    )
+
+    assert "webrtc.offer_accepted" in caplog.text
+    assert "webrtc.answer_created" in caplog.text
+    assert "webrtc.ice_candidate_received" in caplog.text
+    assert "offer-sdp" not in caplog.text
 
 
 @pytest.mark.anyio

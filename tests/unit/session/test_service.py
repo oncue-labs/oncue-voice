@@ -66,6 +66,18 @@ def test_create_is_idempotent_for_same_call_session() -> None:
     assert second == first
 
 
+def test_create_replaces_closed_session_for_same_call_session() -> None:
+    service = SessionService(InMemoryVoiceSessionStore())
+    request = create_request()
+
+    first = service.create(request)
+    service.close(first.voice_session_id, "user_hangup")
+    replacement = service.create(request)
+
+    assert replacement.voice_session_id != first.voice_session_id
+    assert replacement.status is SessionStatus.PREPARED
+
+
 def test_create_rejects_conflicting_duplicate_call_session() -> None:
     service = SessionService(InMemoryVoiceSessionStore())
     service.create(create_request())
