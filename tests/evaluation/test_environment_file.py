@@ -22,7 +22,7 @@ def test_evaluation_notebooks_load_project_environment_file() -> None:
 
 
 def test_environment_example_contains_no_secret_value() -> None:
-    example = Path(".env.example").read_text(encoding="utf-8")
+    example = Path(".env.template").read_text(encoding="utf-8")
 
     assert "OPENAI_API_KEY=" in example
     assert "OPENAI_API_KEY=sk-" not in example

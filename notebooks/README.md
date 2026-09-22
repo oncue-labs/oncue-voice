@@ -12,11 +12,11 @@ Realtime speech-to-speech 평가 notebook은 다음처럼 실행한다.
 poetry run jupyter lab notebooks/realtime_persona_scenario_evaluation.ipynb
 ```
 
-실제 OpenAI 평가를 실행할 때는 `.env.example`을 복사해 `.env`를 만들고 값을 입력한다. `.env`는 Git에 포함되지 않으며 notebook이 자동으로 읽는다. 저장소의 합성 입력 fixture는 `tests/fixtures/evaluation/input.wav`와 `tests/fixtures/evaluation/input.pcm`이다. 실행하는 notebook에 맞춰 `ONCUE_EVALUATION_AUDIO_PATH`를 선택한다. 실행 후 실제로 사용된 입력은 해당 평가 회차의 `input/` 아래에 복사된다.
+실제 OpenAI 평가를 실행할 때는 `.env.template`을 복사해 `.env.local`을 만들고 값을 입력한다. `.env.local`과 `.env.production`은 Git에 포함하지 않는다. 저장소의 합성 입력 fixture는 `tests/fixtures/evaluation/input.wav`와 `tests/fixtures/evaluation/input.pcm`이다. 실행하는 notebook에 맞춰 `ONCUE_EVALUATION_AUDIO_PATH`를 선택한다. 실행 후 실제로 사용된 입력은 해당 평가 회차의 `input/` 아래에 복사된다.
 
 ```bash
-cp .env.example .env
-# .env에서 OPENAI_API_KEY와 ONCUE_EVALUATION_AUDIO_PATH를 입력한다.
+cp .env.template .env.local
+# .env.local에서 OPENAI_API_KEY와 ONCUE_EVALUATION_AUDIO_PATH를 입력한다.
 ```
 
 분리형 pipeline 평가:
@@ -25,7 +25,7 @@ cp .env.example .env
 poetry run jupyter lab notebooks/voice_persona_scenario_evaluation.ipynb
 ```
 
-Realtime 평가도 같은 `.env`를 사용한다. `OPENAI_REALTIME_MODEL`과 선택한 voice 환경 변수는 `.env`에서 변경할 수 있다.
+Realtime 평가도 같은 `.env.local`을 사용한다. `OPENAI_REALTIME_MODEL`과 선택한 voice 환경 변수는 `.env.local`에서 변경할 수 있다.
 
 ```bash
 poetry run jupyter lab notebooks/realtime_persona_scenario_evaluation.ipynb

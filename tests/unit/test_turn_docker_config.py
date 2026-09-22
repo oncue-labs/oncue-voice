@@ -4,7 +4,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).parents[2]
 TURN_CONFIG = REPOSITORY_ROOT / "docker" / "turn" / "coturn.conf"
 TURN_README = REPOSITORY_ROOT / "docker" / "turn" / "README.md"
-ENV_EXAMPLE = REPOSITORY_ROOT / ".env.example"
+ENV_EXAMPLE = REPOSITORY_ROOT / ".env.template"
 
 
 def test_coturn_reference_config_contains_safe_network_defaults() -> None:
